@@ -2,6 +2,15 @@
 
 Building on your work with CNS tags, this assignment will have you generate and compare metadata for news stories using LLMs. You'll extract not just topics, but also people, organizations, locations and other structured information that could be useful for newsrooms. You'll also have the LLMs make some subjective choices.
 
+### Setup
+
+Update from upstream: 
+
+```{bash}
+git fetch upstream
+git merge upstream/main
+```
+
 ### Getting Started
 
 In your class repository, open a codespace and do the following:
@@ -46,7 +55,7 @@ uv run llm keys set anthropic
 and pasting in the key I will give to each of you.
 
 ```{bash}
-uv run python -m newspaper --url=YOUR_URL -of=text | llm -m groq/moonshotai/kimi-k2-instruct-0905 "Extract structured metadata from this news story and return as JSON with these exact fields:
+uv run python -m newspaper --url=YOUR_URL -of=text | uv run llm -m groq/moonshotai/kimi-k2-instruct-0905 "Extract structured metadata from this news story and return as JSON with these exact fields:
 {
   \"url\": \"the url of the story\",
   \"people\": [\"list of up to 3 people with their titles/roles\"],
