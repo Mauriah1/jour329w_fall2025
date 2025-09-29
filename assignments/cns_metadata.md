@@ -75,7 +75,7 @@ Be sure to include the commands you run and the responses in your `notes.md` fil
 
 Compare your own metadata to those created by the LLMs, both in terms of quality but also noting differences. Did the LLMs produce responses that you didn't? Are any of those differences semantically the same? What changes could you make to the llm commands to improve the responses? Try doing that and check the results - did it improve things? How?
 
-What would be the potential issues of repeating this with 50 or 500 stories? How could you improve the consistency of the results? Do not skim on details here, and feel free to speculate or propose ideas even if you don't know if they would work.
+What would be the potential issues of repeating this with 50 or 500 stories? How could you improve the consistency of the results? Do not skimp on details here, and feel free to speculate or propose ideas even if you don't know if they would work.
 
 Finally, what would make this entire process easier, particularly comparing the responses and revising the prompts? If you had to show your work to someone else, what would make that easier?
 
