@@ -66,11 +66,11 @@ Now comes the fun part: you're going to use GitHub Copilot to build a webpage th
 2. **Ask the agent**: Write a detailed note describing exactly what you want
 3. **Iterate and improve**: Keep adding notes to request new features or modifications
 
-You can create separate CSS and JavaScript files, but the page should use `tags.json`.
+You can create separate CSS and JavaScript files, but the page must use `tags.json` as its data source.
 
 ### Your Copilot Conversation
 
-As you work with Copilot, document your process in `notes.md`. For each major feature you add, include:
+As you work with Copilot, document your process in `notes.md`. For each major feature/change you make, include:
 
 1. **What Copilot suggested**
 2. **Whether you accepted it or modified it**
@@ -94,7 +94,7 @@ When you're done building, add a final section to your `notes.md` file reflectin
 - What was frustrating or challenging?
 - How would you change your approach next time?
 
-IMPORTANT: in the chat window above where you put in prompts, right-click and choose "Copy All", then paste that to the bottom of your `notes.md` file.
+**IMPORTANT:** in the chat window above where you put in prompts, right-click and choose "Copy All", then paste that to the bottom of your `notes.md` file.
 
 ### Submission
 
@@ -107,7 +107,7 @@ git pull origin main
 git push origin main
 ```
 
-Submit the link to your tag browser directory (including both the working webpage and your `notes.md` file) in ELMS. Make sure your `index.html` file actually loads and displays the tags when opened in a browser!
+Submit the link to your tag browser directory (including both the working webpage and your `notes.md` file) in ELMS.
 
 ### Extra Credit
 
