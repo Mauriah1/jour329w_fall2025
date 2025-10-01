@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNS Tags Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main>
+        <h1>CNS Tags</h1>
+        <section id="popular-tags-section">
+            <h2>Popular Tags</h2>
+            <div id="popular-tags"></div>
+        </section>
+        <div id="tag-counts" aria-live="polite" style="margin-bottom:0.7rem;"></div>
+        <div class="controls">
+            <input type="text" id="search" placeholder="Search tags..." autocomplete="off">
+            <select id="sort-select">
+                <option value="count-desc">Sort by Count (High → Low)</option>
+                <option value="count-asc">Sort by Count (Low → High)</option>
+                <option value="name-asc">Sort by Name (A → Z)</option>
+                <option value="name-desc">Sort by Name (Z → A)</option>
+            </select>
+            <button id="toggle-view" aria-pressed="false" aria-label="Toggle grid/list view">Grid View</button>
+            <button id="toggle-cloud" aria-pressed="false" aria-label="Toggle tag cloud view">Tag Cloud</button>
+        </div>
+    <div id="tags-container"></div>
+    <div id="tag-cloud-container" style="display:none;"></div>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>
