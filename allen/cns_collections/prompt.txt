@@ -1,0 +1,8 @@
+Create a concise beat guide for a reporter covering Baltimore for Capital News Service.
+Use the data from enhanced_beat_stories.json to summarize:
+- The main story themes and recurring community issues.
+- The key people and institutions to follow.
+- The story type 
+- Suggestions for new story angles and sources.
+
+Format it as a field guide with bullet points and clear subheadings.
