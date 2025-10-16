@@ -1,67 +1,84 @@
-# Baltimore Beat Guide for Capital News Service Reporters
+prompt : Create a concise beat guide for a reporter covering Baltimore for Capital News Service.
+Use the data from enhanced_beat_stories.json to summarize:
+- The main story themes and recurring community issues.
+- The key people and institutions to follow.
+- The story type 
+- Suggestions for new story angles and sources.
+Format it as a field guide with bullet points and clear subheadings.
 
-## Key Story Themes and Recurring Community Issues
-- Urban Inequality
-- Violence Prevention
-- Economic Development
+Answer: 
+Based on the comprehensive dataset of Baltimore news stories, here's a concise beat guide for a Capital News Service reporter covering Baltimore:
+
+BALTIMORE BEAT GUIDE
+
+KEY THEMES & RECURRING ISSUES:
+- Urban Resilience
+- Economic Disparities
+- Community Violence Prevention
 - Infrastructure Challenges
-- Community Resilience
+- Public Health
 - Youth Empowerment
 
-## Key People to Follow
-1. Brandon Scott (Mayor)
-2. Wes Moore (Governor)
-3. City Council Leadership
-4. Community Activists
-   - Tia Hamilton
-   - Wesley Hawkins
-   - Nneka N'namdi
-
-## Institutional Focal Points
-- Baltimore City Council
-- Baltimore Police Department
-- Maryland State Government
-- Community Non-Profits
-- Urban Development Agencies
-
-## Story Type Trends
-- Investigative Reporting
-- Data-Driven Features
-- Community Profiles
+PRIMARY STORY TYPES:
 - Breaking News
-- Long-Form Narratives
+- Feature Stories
+- Community Impact Reporting
+- Investigative Pieces
+- Profile Narratives
 
-## Recommended Story Angles
-1. Neighborhood Transformation
-   - Track progress in areas like Mondawmin
-   - Highlight community-led revitalization efforts
+CRITICAL ONGOING NARRATIVES:
+1. Crime & Public Safety
+- Declining homicide rates
+- Violence prevention programs
+- Community-based intervention strategies
 
-2. Violence Prevention
-   - Deep dive into Safe Streets program
-   - Explore community-based intervention strategies
+2. Economic Development
+- Small business sustainability
+- Neighborhood revitalization efforts
+- Port and infrastructure challenges
 
-3. Economic Mobility
-   - Examine small business ecosystem
-   - Investigate workforce development programs
+3. Social Justice
+- Trauma response
+- Community healing initiatives
+- Equity and inclusion programs
 
-4. Infrastructure Impact
-   - Key Bridge reconstruction effects
-   - Urban redevelopment initiatives
+KEY INSTITUTIONAL SOURCES:
+- Baltimore City Government
+- Baltimore Police Department
+- Johns Hopkins University
+- Local Nonprofit Organizations
+- Maryland State Government
 
-## Recommended Sources
-- Local Community Leaders
+KEY PEOPLE TO FOLLOW:
+- Mayor Brandon Scott
+- Governor Wes Moore
+- Community Leaders:
+  * Tia Hamilton
+  * Wesley Hawkins
+  * Nneka N'namdi
+
+RECOMMENDED STORY ANGLES:
+- Impact of federal/state funding cuts
+- Grassroots community solutions
+- Emerging entrepreneurial initiatives
+- Youth leadership development
+- Neighborhood transformation efforts
+
+RECOMMENDED SOURCE TYPES:
+- Community Activists
+- Small Business Owners
+- Neighborhood Association Leaders
+- Local Educators
+- Public Health Professionals
+
+DIGITAL & DATA RESOURCES:
 - Baltimore Neighborhood Indicators Alliance
-- City Department Heads
-- Grassroots Organization Directors
-- Academic Researchers
+- City Open Data Portal
+- Maryland State Statistics
 
-## Data and Research Resources
-- Baltimore City Open Data Portal
-- Maryland State Data Centers
-- Johns Hopkins Urban Studies Programs
-
-## Emerging Story Trends
-- Post-Pandemic Urban Recovery
-- Technology and Economic Opportunity
-- Mental Health and Community Wellness
-- Racial and Economic Justice Initiatives
+SUGGESTED REPORTING APPROACH:
+- Emphasize Solution-Oriented Journalism
+- Highlight Community Resilience
+- Provide Contextual Depth
+- Center Local Voices
+- Explore Systemic Connections

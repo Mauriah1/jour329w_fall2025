@@ -1,8 +1,41 @@
-Create a concise beat guide for a reporter covering Baltimore for Capital News Service.
-Use the data from enhanced_beat_stories.json to summarize:
-- The main story themes and recurring community issues.
-- The key people and institutions to follow.
-- The story type 
-- Suggestions for new story angles and sources.
+Create a narrative beat guide for a reporter new to both Baltimore AND beat reporting. Write it in a conversational, mentorship tone - like a veteran reporter sitting down with a newcomer to explain how this beat actually works.
+Use the data from enhanced_beat_stories.json to write a guide that:
+1. Opens with "Understanding the Baltimore Beat"
 
-Format it as a field guide with bullet points and clear subheadings.
+Start with a narrative overview: What does covering Baltimore actually mean day-to-day?
+Describe the rhythm of this beat - what a typical week looks like, what demands constant attention vs. what needs deeper investigation
+Explain the major story threads that run through everything and how they connect
+
+2. "The Players You'll Get to Know"
+
+Don't just list names - tell stories about who these people are, why reporters keep going back to them, what they're good for
+Describe the power dynamics: who influences what, which institutions matter most and why
+Include practical tips: "When X happens, call Y first because..." or "Z always has good quotes on..."
+
+3. "How Stories Get Written Here"
+
+Analyze the actual writing style in the data: What makes a strong Baltimore story?
+Show patterns: "Notice how most education stories open with a student or parent, then zoom out to policy..."
+Describe sourcing strategies: who gets quoted, in what order, why
+Point out what works: "The best stories on this beat do X..." with specific examples
+
+4. "Building Your Beat"
+
+Walk through HOW to develop sources (not just who they are)
+Explain what records requests to file, when, and why
+Describe how to balance reactive coverage with enterprise
+Give concrete advice: "Every Monday, check X..." or "When you hear Y, that's your cue to..."
+
+5. "Stories Waiting to Be Told"
+
+Present 3-5 story ideas as pitches, not bullet points
+For each: "Here's the angle, here's why it matters, here's who to talk to first, here's the document that will unlock it"
+Explain the reporting process: "Start by..., then..., watch out for..."
+
+6. "What You Need to Know Walking In"
+
+Share essential context as narrative: "Here's what's really going on with..."
+Flag sensitivities: "When covering X, remember that..."
+Provide the historical backdrop that makes current stories make sense
+
+Write this as a 1-2 page guide that reads like a conversation, not a data dump. Use short paragraphs, direct address ("you'll find that..."), and specific examples from the data. Make it something a reporter would actually want to read and refer back to - practical, insightful, and voice-driven

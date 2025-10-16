@@ -64,10 +64,10 @@ def main():
     schema_prompt = """
     {
       "people": ["Mayor Brandon Scott", "Governor Wes Moore"],
-      "geographic_focus": "Baltimore City",
+      "geographic_focus": "Baltimore City, Baltimore County",
       "key_institutions": ["Maryland General Assembly", "Department of Environment", "Baltimore City Council","Baltimore Police Department"],
-      "beat_specific_field": "value"
-      "story_type": "Example: feature, investigative, breaking news, profile, data-driven, or opinion",
+      "beat_specific_field": ""Example: feature, investigative, breaking news, profile, data-driven, or opinion"],
+      "neighborhoood": "Example: Inner Harbor, Locust Point, Mount Washington",
     }
     """
 
