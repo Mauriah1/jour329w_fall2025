@@ -1,0 +1,9 @@
+Create a concise, engaging Race & Diversity guide for a reporter covering Maryland’s Eastern Shore, focusing only on the most important stories, events, and people from 2024–2025, including changes in ICE enforcement and other race-related events. Organize around major themes, highlight key players and institutions, and include a clear, visual-style timeline showing how coverage evolved. Provide geographic context showing which communities are most and least covered. Include a short list of frequently used terms that would help a reporter. Keep the narrative readable, practical, and focused on what really matters, avoiding unnecessary details.
+
+The guide should support different output formats, including HTML with a table of contents and internal links, multiple smaller documents (one per theme, location, or institution), a visual timeline format, and a “frequently covered” vs “under-covered” analysis.
+
+Include different content focuses, such as story gap analysis (what’s been covered vs. missing), source diversity (who gets quoted most vs. missing voices), beat coverage patterns (types of stories that dominate), seasonal/temporal analysis (how coverage changes over time), and geographic equity (which communities get more/less coverage).
+
+Optionally, enhance the guide with additional metadata, such as cross-references to census data or election results, and sections on demographics or economic indicators. Produce multi-part formats if useful, such as a main guide with detailed appendices, a quick reference card plus full guide, or different versions tailored to editors, reporters, or interns.
+
+Focus on being concise, narrative, and engaging, prioritizing only the most important information, real examples from the stories, and actionable insights for someone new to the beat. Keep the guide visually structured with timelines, headings, and internal references to make it easy to navigate and read.
