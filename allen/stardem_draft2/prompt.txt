@@ -1,0 +1,648 @@
+"""
+Generate a reporter's guide from a large collection of news stories.
+Two-pass approach: extract key information, then synthesize into narrative.
+ENHANCED: Maximum visual beat book elements with tables, timelines, and rich formatting.
+"""
+
+import json
+import llm
+import sys
+import re
+from pathlib import Path
+
+def get_model(model_name=None):
+    """Get the LLM model to use."""
+    if model_name:
+        return llm.get_model(model_name)
+    return llm.get_model()
+
+def clean_qwen_output(text):
+    """Remove <think></think> tags from Qwen model output."""
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned.strip()
+
+def extract_from_batch(stories, batch_num, model, use_qwen=False):
+    """First pass: extract key information - CONCISE VERSION with essential fields only."""
+    
+    # Extract only essential fields to reduce token count
+    essential_stories = []
+    for i, story in enumerate(stories, 1):
+        essential = f"Story {i}:\n"
+        if isinstance(story, dict):
+            if 'title' in story:
+                essential += f"Title: {story['title']}\n"
+            if 'headline' in story:
+                essential += f"Headline: {story['headline']}\n"
+            if 'content' in story:
+                # Limit content to first 500 chars
+                content = str(story['content'])[:500]
+                essential += f"Content: {content}...\n"
+            if 'text' in story:
+                # Limit text to first 500 chars
+                text = str(story['text'])[:500]
+                essential += f"Text: {text}...\n"
+            if 'date' in story:
+                essential += f"Date: {story['date']}\n"
+            if 'published' in story:
+                essential += f"Published: {story['published']}\n"
+        essential += "\n"
+        essential_stories.append(essential)
+    
+    stories_text = "\n".join(essential_stories)
+    
+    prompt = f"""Analyze these {len(stories)} Maryland Eastern Shore stories about Race & Diversity. Extract ONLY the most important information in a CONCISE format:
+
+**KEY THEMES:** (2-3 sentences max)
+**IMPORTANT PEOPLE:** Name (Role) - why they matter (1 line each, max 5 people)
+**ORGANIZATIONS:** Name - significance (1 line each, max 5 orgs)
+**MAJOR EVENTS:** Date: Event (1 line each, max 5 events)
+**LOCATIONS:** Town/County mentioned (list only)
+**COVERAGE PATTERNS:** What types of stories? Whose voices? (2-3 sentences)
+
+Be EXTREMELY concise. Focus on facts, names, dates. No elaboration.
+
+STORIES:
+{stories_text}
+
+CONCISE SUMMARY:"""
+    
+    print(f"Processing batch {batch_num}...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_intermediate(summaries, level, model, use_qwen=False):
+    """Synthesize a group of summaries - CONCISE VERSION."""
+    combined = "\n\n---\n\n".join(
+        f"SECTION {i+1}:\n{summary}" 
+        for i, summary in enumerate(summaries)
+    )
+    
+    prompt = f"""Consolidate these {len(summaries)} summaries. Keep it CONCISE.
+
+Combine and deduplicate:
+- People (name, role, why they matter)
+- Organizations (name, significance)
+- Themes (major issues)
+- Events (date, what happened)
+- Locations (towns/counties)
+- Coverage patterns (what's covered, what's missing)
+
+Remove duplicates. Keep only the most important items. Be brief.
+
+SUMMARIES:
+{combined}
+
+CONSOLIDATED (CONCISE):"""
+    
+    print(f"Consolidating level {level} ({len(summaries)} summaries)...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_guide(batch_summaries, topic, model, max_summaries_per_level=3, use_qwen=False):
+    """Hierarchically synthesize batch summaries into a comprehensive, VISUAL beat book guide."""
+    
+    if len(batch_summaries) <= max_summaries_per_level:
+        combined = "\n\n---\n\n".join(
+            f"BATCH {i+1}:\n{summary}" 
+            for i, summary in enumerate(batch_summaries)
+        )
+    else:
+        current_level = batch_summaries
+        level = 1
+        
+        while len(current_level) > max_summaries_per_level:
+            next_level = []
+            for i in range(0, len(current_level), max_summaries_per_level):
+                group = current_level[i:i+max_summaries_per_level]
+                consolidated = synthesize_intermediate(group, level, model, use_qwen)
+                next_level.append(consolidated)
+            current_level = next_level
+            level += 1
+        
+        combined = "\n\n---\n\n".join(
+            f"SECTION {i+1}:\n{summary}" 
+            for i, summary in enumerate(current_level)
+        )
+    
+    # Build the synthesis prompt
+    prompt = """Create an engaging, HIGHLY VISUAL Beat Book for """ + topic + """ on Maryland's Eastern Shore (2024-2025).
+
+This is a professional REPORTER'S BEAT BOOK - make it visually rich, scannable, and packed with useful formatting.
+
+---
+
+## TABLE OF CONTENTS
+Create clickable internal links:
+- [Overview](#overview-the-beat-at-a-glance)
+- [Timeline](#timeline-how-coverage-unfolded)
+- [Key Players](#key-players-who-you-need-to-know)
+- [Organizations](#organizations-institutions)
+- [Geographic Coverage](#geographic-coverage-where-the-stories-are)
+- [Major Themes](#major-themes-story-arcs)
+- [Coverage Analysis](#coverage-analysis-patterns-gaps)
+- [Reporter's Toolkit](#reporters-toolkit)
+- [Story Ideas](#story-ideas-angles)
+- [Quick Reference](#quick-reference-card)
+
+---
+
+## OVERVIEW: The Beat at a Glance
+
+Write 2-3 compelling paragraphs that explain:
+- What this beat is really about
+- Why it matters to the Eastern Shore
+- What makes it challenging or important
+- What's changed in 2024-2025
+
+Include a quick stats box:
+> AT A GLANCE
+> Total Communities Covered: [Number]
+> Most Active Period: [Month/season]
+> Primary Issues: [Top 3-4 themes]
+> Key Debate: [Central tension or question]
+
+---
+
+## TIMELINE: How Coverage Unfolded
+
+Create a VISUAL chronological timeline:
+
+### 2024
+
+**January 2024**
+* [Event Name] - [Brief description with key players]
+* [Another Event] - [What happened and why it matters]
+
+**February 2024**
+* [Event] - [Description]
+
+**March 2024**
+* [Event] - [Description]
+
+[Continue through all months with significant coverage]
+
+### 2025
+
+**January 2025**
+* [Event] - [Recent developments]
+
+**Present**
+* [Current status] - [Where things stand now]
+
+PIVOTAL MOMENTS (The stories that defined this beat)
+1. [Date]: [Event] - [Why it was significant]
+2. [Date]: [Event] - [Impact on coverage]
+3. [Date]: [Event] - [What changed after this]
+
+---
+
+## KEY PLAYERS: Who You Need to Know
+
+### Quick Reference Directory
+
+Create a TABLE:
+
+| Name | Title/Organization | Role in Coverage | Frequency | Contact Status |
+|------|-------------------|------------------|-----------|----------------|
+| [Name] | [Title, Org] | [What they contribute] | High/Med/Low | Known/TBD |
+
+### The Main Characters
+
+**GOVERNMENT & OFFICIALS**
+- [Name] ([Title], [Organization])
+  Why they matter: [1-2 sentences]
+  Quote frequency: [Often/Occasional/Rare]
+  Stance: [Their position or perspective]
+
+**COMMUNITY LEADERS & ADVOCATES**
+- [Name] ([Title], [Organization])
+  Why they matter: [1-2 sentences]
+  Quote frequency: [Often/Occasional/Rare]
+  Represents: [Which community or viewpoint]
+
+**LAW ENFORCEMENT & LEGAL**
+- [Name] ([Title], [Agency])
+  Why they matter: [1-2 sentences]
+
+### Voice Analysis
+
+WHO GETS HEARD vs WHO'S MISSING
+
+| Perspective | Coverage Level | Gap Analysis |
+|------------|----------------|--------------|
+| Law enforcement | High | [Notes] |
+| Community members | Medium | [What's missing] |
+| Elected officials | High | [Notes] |
+| Immigration advocates | Medium | [Gaps] |
+| Affected families | Low | [Major gap] |
+
+---
+
+## ORGANIZATIONS & INSTITUTIONS
+
+### Most Prominent in Coverage
+
+[Organization Name] (High prominence)
+- Location: [Town/City]
+- Mission: [What they do]
+- Coverage: [Why they appear in stories]
+- Key Contact: [Name, title if known]
+
+### Important but Under-Covered
+
+[Organization Name]
+Why they matter despite less coverage: [Explanation]
+
+### By Type
+
+| Type | Organizations | Coverage Level |
+|------|--------------|----------------|
+| Government agencies | [List] | High/Med/Low |
+| Advocacy groups | [List] | High/Med/Low |
+| Community orgs | [List] | High/Med/Low |
+| Legal services | [List] | High/Med/Low |
+
+---
+
+## GEOGRAPHIC COVERAGE: Where the Stories Are
+
+### Coverage Heatmap
+
+**HEAVILY COVERED (10+ stories)**
+- Salisbury (Wicomico County) - [X stories] - [Why: proximity to events, etc.]
+- [Town] ([County]) - [X stories] - [Why]
+
+**MODERATELY COVERED (5-9 stories)**
+- [Town] ([County]) - [X stories] - [Types of coverage]
+
+**LIGHTLY COVERED (1-4 stories)**
+- [Town] ([County]) - [X stories] - [When/why mentioned]
+
+**NOT COVERED (Notable absences)**
+- [Town] ([County]) - [Why this gap matters]
+
+### Geographic Patterns
+
+Write 2-3 paragraphs analyzing:
+- Why certain communities dominate coverage
+- What communities are overlooked and why
+- Urban vs rural coverage patterns
+- How geography relates to story types
+
+### County Breakdown
+
+| County | Stories | Primary Focus | Coverage Gap |
+|--------|---------|---------------|--------------|
+| Wicomico | [X] | [Topics] | [What's missing] |
+| Dorchester | [X] | [Topics] | [Gaps] |
+| Talbot | [X] | [Topics] | [Gaps] |
+
+---
+
+## MAJOR THEMES & STORY ARCS
+
+### Theme 1: [Name of Theme]
+
+**What it is:** [2-3 sentence description]
+
+**How it evolved:**
+- Early 2024: [Status then]
+- Mid 2024: [Developments]
+- Late 2024-2025: [Current state]
+
+**Key moments:**
+* [Date/Event]
+* [Date/Event]
+
+**Ongoing questions:**
+- [What remains unresolved]
+- [Where the story goes next]
+
+**Story angles to explore:**
+- [Uncovered angle 1]
+- [Missing perspective]
+
+### Theme 2: [Name of Theme]
+
+[Same structure as Theme 1]
+
+### Theme 3: [Name of Theme]
+
+[Same structure]
+
+---
+
+## COVERAGE ANALYSIS: Patterns & Gaps
+
+### What Dominates Coverage
+
+**Story Types:**
+- Breaking news: [X%] - [Description of typical stories]
+- Feature profiles: [X%] - [Types]
+- Policy/government: [X%] - [Focus areas]
+- Investigations: [X%] - [Topics]
+
+**Narrative Angles:**
+
+WELL-COVERED:
+- [Angle 1]: [Why it gets attention]
+- [Angle 2]: [Examples]
+
+MISSING OR WEAK:
+- [Gap 1]: [What's not being told]
+- [Gap 2]: [Missed opportunities]
+
+### Source Diversity Scorecard
+
+| Source Type | Usage | Quality | Notes |
+|------------|-------|---------|-------|
+| Official sources | High | [Assessment] | [Observations] |
+| Community voices | Medium | [Assessment] | [Who's missing] |
+| Expert analysis | Medium | [Assessment] | [Gaps] |
+| Affected individuals | Low | [Assessment] | [Critical gap] |
+
+### Temporal Patterns
+
+**When does coverage spike?**
+- [Month/Season]: [Why - events, releases, etc.]
+- [Period]: [Pattern observed]
+
+**Coverage intensity over time:**
+- [Month]: Peak (due to [event/reason])
+- [Month]: Decline (because [reason])
+- [Month]: Steady (ongoing [theme])
+
+### The Big Gaps
+
+CRITICAL MISSING ANGLES:
+1. [Gap description] - [Why it matters]
+2. [Gap description] - [Impact of not covering]
+3. [Gap description] - [Story opportunity]
+
+---
+
+## REPORTERS TOOLKIT
+
+### Key Terms & Jargon
+
+| Term/Acronym | Definition | Context/Usage |
+|--------------|------------|---------------|
+| [Term] | [Definition] | [When you'll hear it] |
+| [Acronym] | [Stands for] | [Why it matters] |
+| [Phrase] | [Meaning] | [Who uses it] |
+
+### Essential Background
+
+**Historical Context:**
+[2-3 paragraphs explaining the essential history that shapes current coverage]
+
+**Key Data Points:**
+- [Statistic]: [Source] - [Why it matters]
+- [Demographic fact]: [Source] - [Relevance]
+- [Trend]: [What it shows]
+
+### Sensitivities & Considerations
+
+BE AWARE:
+- [Sensitivity 1]: [Why it matters, how to approach]
+- [Community concern]: [Background, respectful framing]
+- [Political tension]: [Context, balanced approach]
+
+### Resources & Contacts
+
+**Data Sources:**
+- [Source name]: [What it provides] - [How to access]
+- [Database]: [Contents] - [Link/contact]
+
+**Background Reading:**
+- [Report/article title]: [Why it's essential]
+- [Resource]: [What it explains]
+
+**Key Contacts:**
+- [Organization]: [Contact name/role] - [When to reach out]
+- [Agency]: [Spokesperson] - [Their beat]
+
+### Interview Tips
+
+**Good questions to ask:**
+- [Question that gets at core issue]
+- [Follow-up that reveals perspective]
+- [Data request that adds context]
+
+**Perspectives to include:**
+- [Viewpoint 1] - [Representative source]
+- [Viewpoint 2] - [Who to talk to]
+- [Viewpoint 3] - [Missing voice to find]
+
+---
+
+## STORY IDEAS & ANGLES
+
+### Immediate Opportunities
+
+1. [Story Pitch Title]
+   - The angle: [What's the hook]
+   - Why now: [Timeliness]
+   - Sources: [Who to talk to]
+   - Gap it fills: [What hasn't been covered]
+
+2. [Another Pitch]
+   [Same structure]
+
+### Follow-Up Stories
+
+- [Event/Story] - [What's happened since? What's next?]
+- [Previous coverage] - [Deeper dive angle]
+
+### Under-Explored Angles
+
+- [Community/perspective] deserves deeper look because [reason]
+- [Issue] connects to [bigger trend] but hasn't been explored
+- [Data/trend] suggests story about [angle]
+
+---
+
+## QUICK REFERENCE CARD
+
+### Top 5 People to Know Right Now
+
+1. [Name] ([Title]) - [Why crucial]
+2. [Name] ([Title]) - [Significance]
+3. [Name] ([Title]) - [Role]
+4. [Name] ([Title]) - [Impact]
+5. [Name] ([Title]) - [Why they matter]
+
+### Top 5 Organizations
+
+1. [Org] - [What they do]
+2. [Org] - [Their role]
+3. [Org] - [Why important]
+4. [Org] - [Coverage angle]
+5. [Org] - [Significance]
+
+### Top 3 Ongoing Stories to Watch
+
+1. [Story Arc]: [Current status & what to watch for]
+2. [Story Arc]: [Developments & next steps]
+3. [Story Arc]: [Key questions & timeline]
+
+### Must-Know Stats
+
+- [Stat]: [Number/fact] - [Source]
+- [Demographic]: [Data] - [Implication]
+- [Trend]: [Direction] - [What it means]
+
+### Emergency Contacts
+
+- [Crisis type]: [Organization/person] - [Phone/email]
+- [Situation]: [Who to call] - [Contact info]
+
+---
+
+FORMATTING REQUIREMENTS:
+
+- Use emojis for visual navigation
+- Create tables for ALL structured data
+- Use color indicators and emphasis
+- Use blockquotes for callouts
+- Use bold liberally for names and headers
+- Mix tables, lists, and narrative prose
+- Include specific examples with REAL names, dates, and places
+- Make it SCANNABLE
+
+SUMMARIES TO SYNTHESIZE:
+""" + combined + """
+
+---
+
+CREATE THE VISUAL BEAT BOOK:"""
+    
+    print("Synthesizing final guide...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Generate a visual Beat Book for Maryland Eastern Shore'
+    )
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='Path to JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide.md',
+                       help='Output file (default: reporter_guide.md)')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', 
+                       choices=[
+                           'groq/openai/gpt-oss-20b',
+                           'groq/openai/gpt-oss-120b',
+                           'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                           'groq/moonshotai/kimi-k2-instruct-0905',
+                           'groq/qwen/qwen3-32b'
+                       ],
+                       help='LLM model to use')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--summaries-only', action='store_true',
+                       help='Save batch summaries without synthesis')
+    parser.add_argument('--debug', action='store_true',
+                       help='Save intermediate outputs')
+    parser.add_argument('--max-consolidate', type=int, default=3,
+                       help='Max summaries to consolidate at once (default: 3)')
+    
+    args = parser.parse_args()
+    
+    use_qwen = args.model == 'groq/qwen/qwen3-32b' if args.model else False
+    
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict) and 'stories' in data:
+        stories = data['stories']
+    elif isinstance(data, dict) and 'articles' in data:
+        stories = data['articles']
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    if use_qwen:
+        print("NOTE: Qwen model - will strip <think> tags", file=sys.stderr)
+    
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, use_qwen)
+        batch_summaries.append(summary)
+        
+        if args.debug:
+            debug_file = f"debug_batch_{batch_num:03d}.md"
+            with open(debug_file, 'w') as f:
+                f.write(summary)
+            print(f"  Saved: {debug_file}", file=sys.stderr)
+    
+    if args.debug:
+        total_chars = sum(len(s) for s in batch_summaries)
+        total_words = sum(len(s.split()) for s in batch_summaries)
+        print(f"\nDEBUG: Total summaries:", file=sys.stderr)
+        print(f"  {total_chars:,} characters", file=sys.stderr)
+        print(f"  {total_words:,} words", file=sys.stderr)
+        print(f"  ~{total_words * 1.3:.0f} tokens (estimate)", file=sys.stderr)
+    
+    if args.summaries_only:
+        output_file = args.output.replace('.md', '_summaries.md')
+        with open(output_file, 'w') as f:
+            for i, summary in enumerate(batch_summaries, 1):
+                f.write(f"\n\n## Batch {i}\n\n{summary}\n")
+        print(f"Batch summaries saved to {output_file}", file=sys.stderr)
+        return
+    
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_summaries_per_level=args.max_consolidate, 
+                           use_qwen=use_qwen)
+    
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore Coverage (2024-2025)\n\n")
+        f.write("---\n\n")
+        f.write(guide)
+    
+    print(f"\nBeat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()

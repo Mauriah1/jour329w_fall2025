@@ -1,0 +1,519 @@
+"""
+Generate a reporter's guide from a large collection of news stories.
+Two-pass approach: extract key information, then synthesize into narrative.
+HYBRID: Combines narrative storytelling with strategic visual elements.
+"""
+
+import json
+import llm
+import sys
+import re
+from pathlib import Path
+
+def get_model(model_name=None):
+    """Get the LLM model to use."""
+    if model_name:
+        return llm.get_model(model_name)
+    return llm.get_model()
+
+def clean_qwen_output(text):
+    """Remove <think></think> tags from Qwen model output."""
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned.strip()
+
+def extract_from_batch(stories, batch_num, model, use_qwen=False):
+    """First pass: extract key information with essential fields only."""
+    
+    # Extract only essential fields to reduce token count
+    essential_stories = []
+    for i, story in enumerate(stories, 1):
+        essential = f"Story {i}:\n"
+        if isinstance(story, dict):
+            if 'title' in story:
+                essential += f"Title: {story['title']}\n"
+            if 'headline' in story:
+                essential += f"Headline: {story['headline']}\n"
+            if 'content' in story:
+                content = str(story['content'])[:500]
+                essential += f"Content: {content}...\n"
+            if 'text' in story:
+                text = str(story['text'])[:500]
+                essential += f"Text: {text}...\n"
+            if 'date' in story:
+                essential += f"Date: {story['date']}\n"
+            if 'published' in story:
+                essential += f"Published: {story['published']}\n"
+        essential += "\n"
+        essential_stories.append(essential)
+    
+    stories_text = "\n".join(essential_stories)
+    
+    prompt = f"""Analyze these {len(stories)} Maryland Eastern Shore stories about Race & Diversity. Extract key information:
+
+**KEY THEMES:** (2-3 sentences)
+**IMPORTANT PEOPLE:** Name (Role) - significance (1 line each, max 5)
+**ORGANIZATIONS:** Name - what they do (1 line each, max 5)
+**MAJOR EVENTS:** Date: Event description (1 line each, max 5)
+**LOCATIONS:** Specific towns/counties mentioned
+**COVERAGE PATTERNS:** Story types, voices heard (2-3 sentences)
+
+Be concise. Focus on names, dates, places.
+
+STORIES:
+{stories_text}
+
+CONCISE SUMMARY:"""
+    
+    print(f"Processing batch {batch_num}...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_intermediate(summaries, level, model, use_qwen=False):
+    """Synthesize summaries - concise version."""
+    combined = "\n\n---\n\n".join(
+        f"SECTION {i+1}:\n{summary}" 
+        for i, summary in enumerate(summaries)
+    )
+    
+    prompt = f"""Consolidate these {len(summaries)} summaries. Keep it CONCISE.
+
+Combine and deduplicate:
+- People (name, role, why they matter)
+- Organizations (name, significance)
+- Themes (major issues)
+- Events (date, what happened)
+- Locations (specific towns/counties)
+- Coverage patterns
+
+Remove duplicates. Keep important items. Be brief.
+
+SUMMARIES:
+{combined}
+
+CONSOLIDATED:"""
+    
+    print(f"Consolidating level {level} ({len(summaries)} summaries)...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_guide(batch_summaries, topic, model, max_summaries_per_level=3, use_qwen=False):
+    """Synthesize batch summaries into narrative beat book with strategic visual elements."""
+    
+    if len(batch_summaries) <= max_summaries_per_level:
+        combined = "\n\n---\n\n".join(
+            f"BATCH {i+1}:\n{summary}" 
+            for i, summary in enumerate(batch_summaries)
+        )
+    else:
+        current_level = batch_summaries
+        level = 1
+        
+        while len(current_level) > max_summaries_per_level:
+            next_level = []
+            for i in range(0, len(current_level), max_summaries_per_level):
+                group = current_level[i:i+max_summaries_per_level]
+                consolidated = synthesize_intermediate(group, level, model, use_qwen)
+                next_level.append(consolidated)
+            current_level = next_level
+            level += 1
+        
+        combined = "\n\n---\n\n".join(
+            f"SECTION {i+1}:\n{summary}" 
+            for i, summary in enumerate(current_level)
+        )
+    
+    # NARRATIVE-FOCUSED synthesis prompt with strategic visual elements
+    prompt = """Create a NARRATIVE Reporter's Beat Book for """ + topic + """ on Maryland's Eastern Shore (2024-2025).
+
+This should read like a STORY with strategic visual elements for quick reference - not a database. Think: engaging journalism meets practical handbook.
+
+CRITICAL: Use REAL NAMES, SPECIFIC PLACES, ACTUAL DATES throughout. No generic placeholders. If the summaries mention "Easton" or "Cambridge" or "Pastor Daniel Fuentes" - USE THOSE EXACT NAMES.
+
+---
+
+## OPENING: The Beat in Context
+
+Write 3-4 compelling narrative paragraphs that set the scene:
+- What is this region? What's its history with race and diversity?
+- What has changed in 2024-2025? What's the central tension?
+- Why does this matter beyond the Eastern Shore?
+- What human stories capture the essence of this beat?
+
+Use specific examples. Name specific people and places. Make it vivid and immediate.
+
+> **Quick Stats Box**
+> Communities covered: [specific number]
+> Key period: [timeframe of most intense coverage]
+> Central issues: [3-4 specific themes]
+> Most affected areas: [name specific towns]
+
+---
+
+## MAJOR STORY ARCS: How Coverage Evolved
+
+Write this as a NARRATIVE TIMELINE - tell the story chronologically with context, causes, and effects.
+
+### 2023-Early 2024: [Phase Name]
+Write 2-3 paragraphs describing this period. Include:
+- What was happening? Specific events with dates
+- Who was involved? Name people and organizations
+- Where? Name specific communities
+- What was the tone/focus of coverage?
+
+### Spring-Summer 2024: [Phase Name]
+[Same narrative structure - 2-3 paragraphs with specific details]
+
+### Fall 2024-Winter 2025: [Phase Name]
+[Same structure]
+
+### 2025-Present: [Phase Name]
+[Same structure]
+
+**Pivotal Moments** (3-5 defining events)
+For each, write a SHORT paragraph (3-4 sentences):
+* **[Specific Date]**: [Event name] - What happened, who was involved, why it mattered, what changed after
+
+---
+
+## KEY PLAYERS: The People Driving This Story
+
+Write this as NARRATIVE PROFILES, not a giant table. Group by role but make each person come alive.
+
+### Political Leadership
+
+Write flowing paragraphs introducing the key political figures. For each person include:
+- Full name and exact title
+- What they've done on this beat (specific actions/votes/statements)
+- Why they matter to the story
+- How often they appear in coverage
+- Their stance or perspective
+
+Example style: "**Easton Mayor Megan Cook** has become one of the Pride festival's most consistent supporters, publicly discussing her experience as parent to an LGBTQ+ child. Her steady advocacy contrasts sharply with council members **Frank Gunsallus** and **David Montgomery**, who voted against the 2024 Pride permit and have repeatedly questioned diversity initiatives..."
+
+### Community Leaders & Advocates
+
+[Same narrative approach - flowing paragraphs with specific details about each person]
+
+### Religious Leaders
+
+[Same approach]
+
+### Historians & Cultural Preservationists
+
+[Same approach]
+
+**Quick Reference: Most Quoted Sources**
+| Name | Role | Quote Frequency |
+|------|------|----------------|
+| [Specific names from summaries] | [Their roles] | High/Med/Low |
+
+(Keep this table SMALL - max 5-7 people)
+
+---
+
+## ORGANIZATIONS & INSTITUTIONS: The Infrastructure of Change
+
+Write narrative paragraphs describing the key organizations. Group thematically but tell stories.
+
+**Most Active Organizations**
+
+For each major org, write a SHORT paragraph (4-5 sentences):
+- What they do
+- Where they're based (specific town)
+- Key people associated with them
+- What role they play in coverage
+- Specific examples of their work
+
+**Under the Radar**
+Brief mention (1-2 sentences each) of organizations that matter but get less coverage.
+
+---
+
+## GEOGRAPHIC PATTERNS: Where the Stories Are
+
+Write this as NARRATIVE with strategic visual elements.
+
+**Coverage Hotspots**
+
+Write flowing paragraphs describing the geographic distribution:
+
+"**Talbot County**, particularly **Easton**, dominates coverage as the site of [specific events]. The county seat of 16,000 has become the main stage for [describe what happens there]. [Continue with specific examples]...
+
+**Cambridge** in **Dorchester County** emerges as [describe its role], particularly around [specific events and dates]. The town's history as [context] shapes how [current issues] play out...
+
+**Caroline County's** small towns reveal [pattern]. **Federalsburg** made history when [specific event with date], while tiny **Marydel** [describe what happened there]..."
+
+**Coverage Intensity by County**
+| County | Primary Towns | Main Story Focus | Notable Gap |
+|--------|--------------|------------------|-------------|
+| Talbot | Easton, [others] | [Specific themes] | [What's missing] |
+| Dorchester | Cambridge, [others] | [Themes] | [Gaps] |
+| Caroline | Federalsburg, Marydel | [Themes] | [Gaps] |
+
+(Keep table focused - 5-6 counties max)
+
+**The Underreported Shore**
+Write 1-2 paragraphs about communities that should be in coverage but aren't. Name specific towns. Explain why they matter and what's being missed.
+
+---
+
+## MAJOR THEMES: The Continuing Stories
+
+For each theme, write as a NARRATIVE ARC (not bullet points).
+
+### Theme 1: [Specific Theme Name from Coverage]
+
+Write 3-4 paragraphs that tell this as a story:
+- What is this theme really about?
+- How did it start? (Specific event/date that kicked it off)
+- How has it evolved? (Key moments with dates)
+- Who are the main players? (Name them)
+- Where is it happening? (Specific places)
+- What's unresolved? What's next?
+- What angles haven't been covered?
+
+### Theme 2: [Specific Theme Name]
+
+[Same narrative structure]
+
+### Theme 3: [Specific Theme Name]
+
+[Same structure]
+
+---
+
+## COVERAGE ANALYSIS: What Gets Told, What Gets Missed
+
+Write this as analytical PROSE with occasional strategic formatting.
+
+**The Dominant Narratives**
+
+Write 2-3 paragraphs analyzing:
+- What types of stories appear most often? Give specific examples with dates
+- Whose voices are heard most? Name specific people/types quoted frequently
+- What angles get the most attention?
+- When does coverage spike? (Connect to specific events)
+
+**The Gaps & Silences**
+
+Write 2-3 paragraphs exploring:
+- What stories aren't being told? Be specific
+- Whose voices are missing? Name communities or groups
+- What questions aren't being asked?
+- Geographic or demographic blind spots? Name them
+
+**Source Diversity Check** (small strategic table)
+| Source Type | How Often Quoted | What's Missing |
+|------------|-----------------|----------------|
+| [Type] | [Frequency] | [Specific gaps] |
+
+(Keep to 4-5 rows)
+
+---
+
+## REPORTER'S TOOLKIT: What You Need to Know
+
+### Essential Background
+
+Write 2-3 narrative paragraphs explaining:
+- Historical context every reporter needs (mention specific events/dates)
+- Key demographic trends (with numbers if available)
+- Economic/social factors shaping coverage
+- Political dynamics at play
+
+### Key Terms (small strategic table)
+
+| Term | Definition | Why It Matters |
+|------|-----------|----------------|
+| [Term from coverage] | [Clear definition] | [Context] |
+
+(10-15 terms max - most important ones only)
+
+### People & Places Quick Reference
+
+**Top 5 People to Know Right Now:**
+1. **[Full name]** ([exact title]) - [Why crucial in 1 sentence]
+2. [etc.]
+
+**Top 5 Communities to Watch:**
+1. **[Town name]** ([County]) - [Why it matters in 1 sentence]
+2. [etc.]
+
+### Sensitivities & Interview Tips
+
+Write 2-3 paragraphs covering:
+- Community concerns/tensions to be aware of
+- Framing considerations
+- Good questions to ask
+- Perspectives to include
+
+---
+
+## STORY IDEAS: Where to Go Next
+
+Write as narrative PITCHES (not lists).
+
+**Immediate Opportunities**
+
+For each idea, write a SHORT paragraph (3-4 sentences):
+- What's the story? (specific angle)
+- Why now? (timeliness/news peg)
+- Who would you talk to? (name specific people/orgs from coverage)
+- What gap does this fill?
+
+**Follow-Up Angles**
+
+Write 1-2 paragraphs suggesting:
+- Stories that need updates (name specific previous stories)
+- Deeper dives on existing coverage
+- Connections between separate story threads
+
+---
+
+CRITICAL FORMATTING REQUIREMENTS:
+
+1. NARRATIVE FIRST: Most sections should be flowing paragraphs, not lists or giant tables
+2. STRATEGIC VISUALS: Use small tables/lists only for quick reference (5-7 items max)
+3. SPECIFIC DETAILS: Use REAL NAMES, ACTUAL PLACES, EXACT DATES from summaries
+4. NO PLACEHOLDERS: Don't write "[Name]" or "[Town]" - use actual information
+5. READABLE: A reporter should be able to READ this cover-to-cover like a document
+6. SCANNABLE: Use headers, short paragraphs, occasional formatting for quick reference
+7. STORYTELLING: Make it engaging - this is journalism about people and communities
+
+SUMMARIES TO SYNTHESIZE:
+""" + combined + """
+
+---
+
+CREATE THE NARRATIVE BEAT BOOK:"""
+    
+    print("Synthesizing narrative guide...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Generate a narrative Beat Book for Maryland Eastern Shore'
+    )
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='Path to JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide.md',
+                       help='Output file (default: reporter_guide.md)')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', 
+                       choices=[
+                           'groq/openai/gpt-oss-20b',
+                           'groq/openai/gpt-oss-120b',
+                           'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                           'groq/moonshotai/kimi-k2-instruct-0905',
+                           'groq/qwen/qwen3-32b'
+                       ],
+                       help='LLM model to use')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--summaries-only', action='store_true',
+                       help='Save batch summaries without synthesis')
+    parser.add_argument('--debug', action='store_true',
+                       help='Save intermediate outputs')
+    parser.add_argument('--max-consolidate', type=int, default=3,
+                       help='Max summaries to consolidate at once (default: 3)')
+    
+    args = parser.parse_args()
+    
+    use_qwen = args.model == 'groq/qwen/qwen3-32b' if args.model else False
+    
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict) and 'stories' in data:
+        stories = data['stories']
+    elif isinstance(data, dict) and 'articles' in data:
+        stories = data['articles']
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    if use_qwen:
+        print("NOTE: Qwen model - will strip <think> tags", file=sys.stderr)
+    
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, use_qwen)
+        batch_summaries.append(summary)
+        
+        if args.debug:
+            debug_file = f"debug_batch_{batch_num:03d}.md"
+            with open(debug_file, 'w') as f:
+                f.write(summary)
+            print(f"  Saved: {debug_file}", file=sys.stderr)
+    
+    if args.debug:
+        total_chars = sum(len(s) for s in batch_summaries)
+        total_words = sum(len(s.split()) for s in batch_summaries)
+        print(f"\nDEBUG: Total summaries:", file=sys.stderr)
+        print(f"  {total_chars:,} characters", file=sys.stderr)
+        print(f"  {total_words:,} words", file=sys.stderr)
+        print(f"  ~{total_words * 1.3:.0f} tokens (estimate)", file=sys.stderr)
+    
+    if args.summaries_only:
+        output_file = args.output.replace('.md', '_summaries.md')
+        with open(output_file, 'w') as f:
+            for i, summary in enumerate(batch_summaries, 1):
+                f.write(f"\n\n## Batch {i}\n\n{summary}\n")
+        print(f"Batch summaries saved to {output_file}", file=sys.stderr)
+        return
+    
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_summaries_per_level=args.max_consolidate, 
+                           use_qwen=use_qwen)
+    
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore (2024-2025)\n\n")
+        f.write("---\n\n")
+        f.write(guide)
+    
+    print(f"\nNarrative Beat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+    print(f"  Style: Narrative storytelling with strategic visual elements", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()
