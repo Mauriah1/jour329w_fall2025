@@ -1,0 +1,418 @@
+"""
+Generate a reporter's guide from the source_stories_final.json file. 
+Two-pass approach: extract key information, then synthesize into narrative.
+FOCUS: Geographic/county breakdown with community sources and glossary.
+CRITICAL: Only use information from provided stories - NO fabrication.
+"""
+
+import json
+import llm
+import sys
+import re
+from pathlib import Path
+
+def get_model(model_name=None):
+    """Get the LLM model to use."""
+    if model_name:
+        return llm.get_model(model_name)
+    return llm.get_model()
+
+def clean_qwen_output(text):
+    """Remove <think></think> tags from Qwen model output."""
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned.strip()
+
+def extract_from_batch(stories, batch_num, model, use_qwen=False):
+    """First pass: extract key information with essential fields only."""
+    
+    essential_stories = []
+    for i, story in enumerate(stories, 1):
+        essential = f"Story {i}:\n"
+        if isinstance(story, dict):
+            if 'title' in story:
+                essential += f"Title: {story['title']}\n"
+            if 'headline' in story:
+                essential += f"Headline: {story['headline']}\n"
+            if 'content' in story:
+                content = str(story['content'])[:500]
+                essential += f"Content: {content}...\n"
+            if 'text' in story:
+                text = str(story['text'])[:500]
+                essential += f"Text: {text}...\n"
+            if 'date' in story:
+                essential += f"Date: {story['date']}\n"
+            if 'published' in story:
+                essential += f"Published: {story['published']}\n"
+            if 'url' in story:
+                essential += f"URL: {story['url']}\n"
+            if 'source' in story:
+                essential += f"Source: {story['source']}\n"
+        essential += "\n"
+        essential_stories.append(essential)
+    
+    stories_text = "\n".join(essential_stories)
+    
+    prompt = f"""Analyze these {len(stories)} Maryland Eastern Shore stories about Race & Diversity. Extract key information:
+
+**CRITICAL RULE: ONLY extract information that is EXPLICITLY stated in these stories. DO NOT make up, infer, or fabricate any names, dates, events, or details. If something is not in the stories, DO NOT include it.**
+
+**COUNTIES & DEMOGRAPHICS:** Which counties mentioned, racial/ethnic composition, demographic changes
+**KEY THEMES BY COUNTY:** (2-3 sentences per county)
+**COMMUNITY SOURCES:** Name (Role/Organization) - NOT government officials (1 line each, max 8)
+**ORGANIZATIONS:** Name - what they do (1 line each, max 5)
+**MAJOR EVENTS BY LOCATION:** County/Town: Date: Event description (1 line each, max 5)
+**SPECIFIC TERMS/PHRASES:** Local terminology, historical references, cultural terms used
+**KEYWORDS & FRAMING:** How is race discussed? What words/phrases appear repeatedly?
+**STORY REFERENCES:** Note story titles or URLs for major events
+**COVERAGE PATTERNS:** Story types, voices heard (2-3 sentences)
+
+Focus on: geographic patterns, racial demographics, community voices (activists, faith leaders, residents).
+
+ONLY USE INFORMATION FROM THE STORIES BELOW. DO NOT FABRICATE.
+
+STORIES:
+{stories_text}
+
+CONCISE SUMMARY:"""
+    
+    print(f"Processing batch {batch_num}...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_intermediate(summaries, level, model, use_qwen=False):
+    """Synthesize summaries - concise version."""
+    combined = "\n\n---\n\n".join(
+        f"SECTION {i+1}:\n{summary}" 
+        for i, summary in enumerate(summaries)
+    )
+    
+    prompt = f"""Consolidate these {len(summaries)} summaries. Keep it CONCISE.
+
+**CRITICAL: Only use information from these summaries. DO NOT add new names, events, or details that aren't in the summaries.**
+
+Combine and deduplicate by COUNTY:
+- Counties (names, racial demographics, key issues)
+- Community sources (name, role, county, why they matter) - NO government officials
+- Organizations (name, county, significance)
+- Themes by county (major issues)
+- Events (county, date, what happened)
+- Local terms and phrases used
+- Keywords and framing patterns
+- Story references (titles, URLs if available)
+
+Remove duplicates. Keep important items. Be brief.
+
+DO NOT MAKE UP ANY INFORMATION. ONLY USE WHAT'S IN THE SUMMARIES.
+
+SUMMARIES:
+{combined}
+
+CONSOLIDATED:"""
+    
+    print(f"Consolidating level {level} ({len(summaries)} summaries)...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_guide(batch_summaries, topic, model, max_summaries_per_level=3, use_qwen=False):
+    """Synthesize batch summaries into county-focused beat book with glossary."""
+    
+    if len(batch_summaries) <= max_summaries_per_level:
+        combined = "\n\n---\n\n".join(
+            f"BATCH {i+1}:\n{summary}" 
+            for i, summary in enumerate(batch_summaries)
+        )
+    else:
+        current_level = batch_summaries
+        level = 1
+        
+        while len(current_level) > max_summaries_per_level:
+            next_level = []
+            for i in range(0, len(current_level), max_summaries_per_level):
+                group = current_level[i:i+max_summaries_per_level]
+                consolidated = synthesize_intermediate(group, level, model, use_qwen)
+                next_level.append(consolidated)
+            current_level = next_level
+            level += 1
+        
+        combined = "\n\n---\n\n".join(
+            f"SECTION {i+1}:\n{summary}" 
+            for i, summary in enumerate(current_level)
+        )
+    
+    prompt = f"""Create a COUNTY-BY-COUNTY Reporter's Beat Book for {topic} on Maryland's Eastern Shore (2024-2025).
+
+**CRITICAL: ONLY use information from summaries below. DO NOT fabricate names, events, dates, or details. If information is missing, note the gap.**
+
+---
+
+## OPENING: The Beat in Context
+
+Write 2-3 paragraphs on:
+- What is this region and its history with race/diversity (from summaries)
+- What changed in 2024-2025 and central tensions (from summaries)
+- Why geographic variation matters across counties (from summaries)
+
+Quick Stats Box: Counties covered, key period, central geographic pattern, demographic shift (all from summaries)
+
+---
+
+## COUNTY-BY-COUNTY BREAKDOWN (PRIMARY FOCUS - MOST DETAILED SECTION)
+
+For each county in summaries:
+
+**Demographics & Racial Composition:**
+Write 2-3 paragraphs on current breakdown, changes, growing/declining communities, towns/neighborhoods, economic patterns (ONLY if in summaries, else note "not available")
+
+**Primary Race-Related Issues:**
+Write 2-3 paragraphs on main conflicts/tensions, how they differ from other counties, specific examples with dates and names from stories, historical context (from summaries)
+
+**Major Events 2024-2025:**
+For each event: Date, event name, what happened, who involved, outcome - Include story title/URL if available (from summaries)
+
+**Community Dynamics:**
+Write 1-2 paragraphs on relationships between groups, cooperation vs. conflict, generational differences, urban vs. rural dynamics (from summaries)
+
+**Key Towns/Neighborhoods:**
+For each town: 2-3 sentences on population, composition, significance, events (from summaries)
+
+**Notable Patterns:**
+What makes county unique, emerging trends, coverage gaps (from summaries)
+
+**Cross-County Patterns:**
+Write 2-3 paragraphs comparing counties, similar issues, outliers, geographic factors (from summaries)
+
+---
+
+## HOW RACE IS COVERED: Keywords & Framing Analysis
+
+**Common Keywords & Phrases:**
+Write 2-3 paragraphs analyzing specific repeated words/phrases, how issues are framed (celebration/conflict/historic/contemporary), euphemisms, terms by different groups (from summaries)
+
+**Example Story References:**
+For major framing patterns: story title/URL, brief quote or description, what this reveals (from summaries)
+
+**Small table:** Keyword | How Often Used | Context | Example Story Title (from summaries)
+
+**Framing Patterns:**
+Write 2-3 paragraphs on celebratory, conflict, policy, and personal narrative framing with specific story examples (from summaries)
+
+---
+
+## GLOSSARY OF TERMS
+
+Tables for: Historical Terms, Contemporary Issues & Programs, Local/Regional Terminology, Cultural & Community Terms, Acronyms & Organizations (ONLY terms from summaries)
+
+**Usage Notes:**
+Write 1-2 paragraphs on terms requiring sensitivity, language evolution, words to avoid (from summaries)
+
+---
+
+## COMMUNITY SOURCES DIRECTORY (NO GOVERNMENT OFFICIALS)
+
+For each county, organized by: Community Activists, Faith Leaders, Historians, Nonprofit Leaders, Educators, Business Owners, Residents (ONLY people named in summaries)
+
+**Using These Sources:**
+Write 1-2 paragraphs on how sources are quoted, which types appear most, underrepresented voices (from summaries)
+
+---
+
+## MAJOR STORY ARCS: How Coverage Evolved
+
+For each time period: Write 2-3 paragraphs on what was happening and where, regional differences, who was involved, include story references (from summaries)
+
+---
+
+## MAJOR THEMES: The Continuing Stories
+
+For each theme: Write 3-4 paragraphs on how theme manifests across counties, which most affected, specific examples, how geography shapes issue, include story references (from summaries)
+
+---
+
+## COVERAGE ANALYSIS: What Gets Told, What Gets Missed
+
+**Geographic Coverage Patterns:**
+Write 2-3 paragraphs on which counties get most coverage, which underreported, urban vs. rural disparities, correlation with demographics (from summaries)
+
+**Source Diversity by County:**
+Table: County | Most Common Sources | Underrepresented Voices (from summaries)
+
+**Geographic Gaps:**
+Specific towns/areas with no coverage, rural vs. urban disparities, why counties invisible (from summaries)
+
+---
+
+## REPORTER'S TOOLKIT
+
+**Essential Background:**
+Write 2-3 paragraphs on regional history, how Shore differs from rest of Maryland, economic/political factors (from summaries)
+
+**County Quick Reference:**
+Table for each county: Population, racial composition, main towns, key issues, media landscape, gathering places (from summaries)
+
+**Sensitivities & Interview Tips:**
+Write about county-specific concerns, historical traumas, building trust, good questions (from summaries)
+
+---
+
+## STORY IDEAS: Where to Go Next (NARRATIVE PITCHES - NO TABLES)
+
+**County-Specific Opportunities:**
+For each county, write 4-6 sentence narrative paragraph: untold story, why it matters now, which town, who to interview (name specific sources from earlier), what gap it fills, human angle
+
+**Comparative Stories:**
+Write 2-3 narrative paragraphs each: what's the comparison, why revealing, who to talk to in each location, narrative arc
+
+**Follow-Up Angles:**
+Write 2-3 narrative paragraphs: which stories need updates, what happened next, connections not explored, who to revisit with new questions
+
+---
+
+KEY RULES: Use real names/dates/events/story titles from summaries. No brackets. Tables only for Glossary, Source Directory, County Reference, Source Diversity. Story Ideas = narrative only. Every detail must be from summaries.
+
+SUMMARIES:
+{combined}
+
+CREATE BEAT BOOK:"""
+    
+    print("Synthesizing county-focused guide...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Generate a county-focused Beat Book for Maryland Eastern Shore (ONLY from source stories - NO fabrication)'
+    )
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='Path to JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide_county.md',
+                       help='Output file (default: reporter_guide_county.md)')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', 
+                       default='groq/openai/gpt-oss-120b',
+                       choices=[
+                           'groq/openai/gpt-oss-20b',
+                           'groq/openai/gpt-oss-120b',
+                           'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                           'groq/moonshotai/kimi-k2-instruct-0905',
+                           'groq/qwen/qwen3-32b'
+                       ],
+                       help='LLM model to use (default: gpt-oss-120b)')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--summaries-only', action='store_true',
+                       help='Save batch summaries without synthesis')
+    parser.add_argument('--debug', action='store_true',
+                       help='Save intermediate outputs')
+    parser.add_argument('--max-consolidate', type=int, default=3,
+                       help='Max summaries to consolidate at once (default: 3)')
+    
+    args = parser.parse_args()
+    
+    use_qwen = args.model == 'groq/qwen/qwen3-32b' if args.model else False
+    
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    print(f"CRITICAL: Will ONLY use information from stories in {args.input_file}", file=sys.stderr)
+    print(f"NO FABRICATION of names, events, or data will be allowed", file=sys.stderr)
+    
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict) and 'stories' in data:
+        stories = data['stories']
+    elif isinstance(data, dict) and 'articles' in data:
+        stories = data['articles']
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    print(f"FOCUS: County-by-county breakdown with community sources", file=sys.stderr)
+    print(f"INCLUDES: Keyword/framing analysis and story references", file=sys.stderr)
+    print(f"SOURCE: ONLY {args.input_file} - NO external information", file=sys.stderr)
+    if use_qwen:
+        print("NOTE: Qwen model - will strip <think> tags", file=sys.stderr)
+    
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, use_qwen)
+        batch_summaries.append(summary)
+        
+        if args.debug:
+            debug_file = f"debug_batch_{batch_num:03d}.md"
+            with open(debug_file, 'w') as f:
+                f.write(summary)
+            print(f"  Saved: {debug_file}", file=sys.stderr)
+    
+    if args.debug:
+        total_chars = sum(len(s) for s in batch_summaries)
+        total_words = sum(len(s.split()) for s in batch_summaries)
+        print(f"\nDEBUG: Total summaries:", file=sys.stderr)
+        print(f"  {total_chars:,} characters", file=sys.stderr)
+        print(f"  {total_words:,} words", file=sys.stderr)
+        print(f"  ~{total_words * 1.3:.0f} tokens (estimate)", file=sys.stderr)
+    
+    if args.summaries_only:
+        output_file = args.output.replace('.md', '_summaries.md')
+        with open(output_file, 'w') as f:
+            for i, summary in enumerate(batch_summaries, 1):
+                f.write(f"\n\n## Batch {i}\n\n{summary}\n")
+        print(f"Batch summaries saved to {output_file}", file=sys.stderr)
+        return
+    
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_summaries_per_level=args.max_consolidate, 
+                           use_qwen=use_qwen)
+    
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore - County-by-County Guide (2024-2025)\n\n")
+        f.write(f"**SOURCE: Information extracted ONLY from stories in {args.input_file}**\n")
+        f.write(f"**NO fabricated names, events, or data included**\n\n")
+        f.write("---\n\n")
+        f.write(guide)
+    
+    print(f"\nCounty-Focused Beat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+    print(f"  PRIMARY FOCUS: Geographic/county breakdown with racial demographics", file=sys.stderr)
+    print(f"  SOURCES: Community-based (no government officials)", file=sys.stderr)
+    print(f"  INCLUDES: Keyword analysis, story references, narrative story pitches", file=sys.stderr)
+    print(f"  DATA SOURCE: ONLY {args.input_file} - no fabrication", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()

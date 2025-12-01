@@ -1,0 +1,601 @@
+"""
+Generate a reporter's guide from the source_stories_final.json file. 
+Two-pass approach: extract key information, then synthesize into narrative.
+FOCUS: Geographic/county breakdown with community sources and glossary.
+CRITICAL: Only use information from provided stories - NO fabrication.
+"""
+
+import json
+import llm
+import sys
+import re
+from pathlib import Path
+
+def get_model(model_name=None):
+    """Get the LLM model to use."""
+    if model_name:
+        return llm.get_model(model_name)
+    return llm.get_model()
+
+def clean_qwen_output(text):
+    """Remove <think></think> tags from Qwen model output."""
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return cleaned.strip()
+
+def extract_from_batch(stories, batch_num, model, use_qwen=False):
+    """First pass: extract key information with essential fields only."""
+    
+    # Extract only essential fields to reduce token count
+    essential_stories = []
+    for i, story in enumerate(stories, 1):
+        essential = f"Story {i}:\n"
+        if isinstance(story, dict):
+            if 'title' in story:
+                essential += f"Title: {story['title']}\n"
+            if 'headline' in story:
+                essential += f"Headline: {story['headline']}\n"
+            if 'content' in story:
+                content = str(story['content'])[:500]
+                essential += f"Content: {content}...\n"
+            if 'text' in story:
+                text = str(story['text'])[:500]
+                essential += f"Text: {text}...\n"
+            if 'date' in story:
+                essential += f"Date: {story['date']}\n"
+            if 'published' in story:
+                essential += f"Published: {story['published']}\n"
+        essential += "\n"
+        essential_stories.append(essential)
+    
+    stories_text = "\n".join(essential_stories)
+    
+    prompt = f"""Analyze these {len(stories)} Maryland Eastern Shore stories about Race & Diversity. Extract key information:
+
+**CRITICAL RULE: ONLY extract information that is EXPLICITLY stated in these stories. DO NOT make up, infer, or fabricate any names, dates, events, or details. If something is not in the stories, DO NOT include it.**
+
+**COUNTIES & DEMOGRAPHICS:** Which counties mentioned, racial/ethnic composition, demographic changes
+**KEY THEMES BY COUNTY:** (2-3 sentences per county)
+**COMMUNITY SOURCES:** Name (Role/Organization) - NOT government officials (1 line each, max 8)
+**ORGANIZATIONS:** Name - what they do (1 line each, max 5)
+**MAJOR EVENTS BY LOCATION:** County/Town: Date: Event description (1 line each, max 5)
+**SPECIFIC TERMS/PHRASES:** Local terminology, historical references, cultural terms used
+**COVERAGE PATTERNS:** Story types, voices heard (2-3 sentences)
+
+Focus on: geographic patterns, racial demographics, community voices (activists, faith leaders, residents).
+
+ONLY USE INFORMATION FROM THE STORIES BELOW. DO NOT FABRICATE.
+
+STORIES:
+{stories_text}
+
+CONCISE SUMMARY:"""
+    
+    print(f"Processing batch {batch_num}...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_intermediate(summaries, level, model, use_qwen=False):
+    """Synthesize summaries - concise version."""
+    combined = "\n\n---\n\n".join(
+        f"SECTION {i+1}:\n{summary}" 
+        for i, summary in enumerate(summaries)
+    )
+    
+    prompt = f"""Consolidate these {len(summaries)} summaries. Keep it CONCISE.
+
+**CRITICAL: Only use information from these summaries. DO NOT add new names, events, or details that aren't in the summaries.**
+
+Combine and deduplicate by COUNTY:
+- Counties (names, racial demographics, key issues)
+- Community sources (name, role, county, why they matter) - NO government officials
+- Organizations (name, county, significance)
+- Themes by county (major issues)
+- Events (county, date, what happened)
+- Local terms and phrases used
+
+Remove duplicates. Keep important items. Be brief.
+
+DO NOT MAKE UP ANY INFORMATION. ONLY USE WHAT'S IN THE SUMMARIES.
+
+SUMMARIES:
+{combined}
+
+CONSOLIDATED:"""
+    
+    print(f"Consolidating level {level} ({len(summaries)} summaries)...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def synthesize_guide(batch_summaries, topic, model, max_summaries_per_level=3, use_qwen=False):
+    """Synthesize batch summaries into county-focused beat book with glossary."""
+    
+    if len(batch_summaries) <= max_summaries_per_level:
+        combined = "\n\n---\n\n".join(
+            f"BATCH {i+1}:\n{summary}" 
+            for i, summary in enumerate(batch_summaries)
+        )
+    else:
+        current_level = batch_summaries
+        level = 1
+        
+        while len(current_level) > max_summaries_per_level:
+            next_level = []
+            for i in range(0, len(current_level), max_summaries_per_level):
+                group = current_level[i:i+max_summaries_per_level]
+                consolidated = synthesize_intermediate(group, level, model, use_qwen)
+                next_level.append(consolidated)
+            current_level = next_level
+            level += 1
+        
+        combined = "\n\n---\n\n".join(
+            f"SECTION {i+1}:\n{summary}" 
+            for i, summary in enumerate(current_level)
+        )
+    
+    # COUNTY-FOCUSED synthesis prompt
+    prompt = """Create a COUNTY-BY-COUNTY Reporter's Beat Book for """ + topic + """ on Maryland's Eastern Shore (2024-2025).
+
+**MOST IMPORTANT: The geographic/county breakdown should be the PRIMARY focus of this guide.**
+
+**ABSOLUTE CRITICAL RULE - READ THIS CAREFULLY:**
+
+YOU MUST ONLY USE INFORMATION FROM THE SUMMARIES PROVIDED BELOW. 
+
+DO NOT:
+- Make up names of people not mentioned in the summaries
+- Fabricate events that didn't appear in the summaries
+- Invent dates, statistics, or demographic data not in the summaries
+- Create fictional organizations or community groups
+- Add counties, towns, or locations not mentioned in the summaries
+- Infer or assume details not explicitly stated
+
+IF INFORMATION IS NOT IN THE SUMMARIES:
+- Write "No information available in source stories" or similar
+- Leave sections brief or note gaps in coverage
+- Do NOT fill gaps with made-up content
+
+ONLY USE REAL NAMES, DATES, AND EVENTS FROM THE SUMMARIES. When you mention a person, event, organization, or statistic, it MUST come from the source stories.
+
+---
+
+## OPENING: The Beat in Context
+
+Write 2-3 compelling narrative paragraphs that set the scene:
+- What is this region? What's its history with race and diversity?
+- What has changed in 2024-2025? What's the central tension?
+- Why does geographic variation matter? How do different counties experience race differently?
+
+**USE ONLY INFORMATION FROM THE SUMMARIES. If historical context isn't in the summaries, focus on what IS there.**
+
+> **Quick Stats Box**
+> *Counties covered:* [list ONLY counties mentioned in summaries]
+> *Key period:* [timeframe based on actual story dates]
+> *Central geographic pattern:* [based only on patterns in summaries]
+> *Demographic shift:* [only if mentioned in stories]
+
+---
+
+## COUNTY-BY-COUNTY BREAKDOWN
+**THIS IS THE MOST CRITICAL SECTION - PRIORITIZE DETAIL AND SPECIFICITY HERE**
+
+For ONLY the counties actually mentioned in the summaries, create a comprehensive profile:
+
+### [COUNTY NAME] County
+
+**Demographics & Racial Composition:**
+Write 2-3 paragraphs covering:
+- Current racial/ethnic breakdown (ONLY if percentages are in the stories)
+- How demographics have changed (ONLY if mentioned in stories)
+- Which communities are growing/declining (ONLY if stated in stories)
+- Specific towns/neighborhoods and their racial composition (ONLY if in stories)
+- Economic patterns by race/ethnicity (ONLY if in stories)
+
+**If demographic data is not in the stories, write: "Demographic data not available in source coverage" and move to next section.**
+
+**Primary Race-Related Issues:**
+Write 2-3 paragraphs covering:
+- What are the main conflicts or tensions in THIS county? (from actual stories)
+- How do they differ from other counties? (based on story content)
+- Specific examples with dates and people involved (NAMES AND DATES FROM STORIES ONLY)
+- Historical context unique to this county (ONLY if in the stories)
+
+**Major Events & Incidents (2024-2025):**
+For each event ACTUALLY MENTIONED in the summaries for this county:
+- **[Specific Date FROM STORIES]**: [Event name FROM STORIES] - What happened, who was involved, location within county, outcome/impact (2-3 sentences)
+
+**DO NOT list events not mentioned in the source stories.**
+
+**Community Dynamics:**
+Write 1-2 paragraphs on (BASED ON ACTUAL STORIES ONLY):
+- Relationships between different racial/ethnic groups (if covered)
+- Areas of cooperation vs. conflict (from actual stories)
+- Generational differences (if mentioned)
+- Urban vs. rural dynamics within the county (if covered)
+
+**Key Towns/Neighborhoods:**
+For each town ACTUALLY MENTIONED in stories for this county:
+- **[Town Name FROM STORIES]**: [Population if mentioned in stories, racial composition if mentioned, what makes it significant from stories, specific events/issues FROM STORIES] (2-3 sentences)
+
+**Notable Patterns:**
+- What makes this county unique? (based on story content)
+- What trends are emerging? (from actual coverage)
+- What's getting coverage vs. what's being missed? (gaps in actual stories)
+
+[REPEAT THIS STRUCTURE FOR EACH COUNTY ACTUALLY MENTIONED IN SUMMARIES]
+
+**Cross-County Patterns:**
+Write 2-3 paragraphs analyzing (BASED ON ACTUAL STORY CONTENT):
+- How do the counties compare?
+- Which counties face similar issues?
+- Which are outliers and why?
+- Geographic factors (ONLY if discussed in stories)
+
+**If fewer than 3 counties are mentioned in the summaries, note: "Coverage limited to [X] counties in source stories."**
+
+---
+
+## GLOSSARY OF TERMS
+**Essential terminology for covering race & diversity on the Eastern Shore**
+
+**ONLY INCLUDE TERMS ACTUALLY USED IN THE SOURCE STORIES.**
+
+Organize into categories:
+
+### Historical Terms
+| Term | Definition | Context/Usage |
+|------|------------|---------------|
+| [ONLY terms from stories] | [Definition based on story usage] | [How used in actual stories] |
+
+### Contemporary Issues & Programs
+| Term | Definition | Context/Usage |
+|------|------------|---------------|
+| [ONLY programs/initiatives mentioned in stories] | [What it is per stories] | [How it relates to actual coverage] |
+
+### Local/Regional Terminology
+| Term | Definition | Context/Usage |
+|------|------------|---------------|
+| [ONLY Shore-specific phrases from stories] | [Meaning from context] | [Cultural significance if mentioned] |
+
+### Cultural & Community Terms
+| Term | Definition | Context/Usage |
+|------|------------|---------------|
+| [ONLY terms used in stories] | [Definition from story context] | [Context from stories] |
+
+### Acronyms & Organizations
+| Acronym | Full Name | What They Do |
+|---------|-----------|--------------|
+| [ONLY acronyms from stories] | [Full name from stories] | [Role based on story content] |
+
+**If fewer than 5 terms total appear in stories, note: "Limited specialized terminology in source coverage."**
+
+**Usage Notes:**
+Write 1-2 paragraphs on:
+- Terms that require sensitivity (if discussed in stories)
+- How language has evolved in coverage (if evident from stories)
+- Words to avoid (if mentioned in stories)
+
+---
+
+## COMMUNITY SOURCES DIRECTORY
+**Organized by County - NO GOVERNMENT OFFICIALS**
+
+**ONLY INCLUDE PEOPLE ACTUALLY NAMED IN THE SOURCE STORIES.**
+
+For each county WITH ACTUAL SOURCES MENTIONED:
+
+### [COUNTY NAME] County
+
+**Community Activists & Advocates:**
+- **[Full Name FROM STORIES]** - [Organization/Role FROM STORIES] - [Why they're reliable BASED ON STORY CONTENT] - [Areas of expertise FROM STORIES] - [Contact info if in stories]
+
+**DO NOT include people not mentioned in the actual source stories.**
+
+**Faith Leaders:**
+- **[Full Name FROM STORIES]** - [Church/Temple/Mosque FROM STORIES] - [Congregation demographics IF MENTIONED] - [What they speak about FROM STORIES] - [Years in community IF MENTIONED]
+
+**Local Historians & Cultural Preservationists:**
+- **[Full Name FROM STORIES]** - [Affiliation FROM STORIES] - [Expertise area FROM STORIES] - [Publications/Projects IF MENTIONED] - [Why reliable BASED ON STORIES]
+
+**Nonprofit Organization Leaders:**
+- **[Full Name FROM STORIES]** - [Organization name FROM STORIES] - [Organization's work FROM STORIES] - [Their specific role FROM STORIES] - [Community reach IF MENTIONED]
+
+**Educators & Academics:**
+- **[Full Name FROM STORIES]** - [Institution FROM STORIES] - [Subject area FROM STORIES] - [Community engagement FROM STORIES] - [Research focus IF MENTIONED]
+
+**Business Owners & Community Organizers:**
+- **[Full Name FROM STORIES]** - [Business/Organization FROM STORIES] - [Community role FROM STORIES] - [Perspective they offer BASED ON STORIES]
+
+**Long-Time Residents & Community Voices:**
+- **[Full Name FROM STORIES]** - [Neighborhood FROM STORIES] - [Years in community IF MENTIONED] - [Why their perspective matters FROM STORIES]
+
+**If a county has no community sources named in stories, write: "No community sources identified in source coverage for this county."**
+
+[REPEAT FOR EACH COUNTY WITH SOURCES]
+
+**Using These Sources:**
+Write 1-2 paragraphs on (BASED ON ACTUAL STORY PATTERNS):
+- How sources are typically quoted in coverage
+- Which types of sources appear most often
+- Which voices may be underrepresented (gaps in actual coverage)
+
+---
+
+## MAJOR STORY ARCS: How Coverage Evolved
+
+Write this as a NARRATIVE TIMELINE with geographic dimensions.
+
+**ONLY DESCRIBE PERIODS WHERE ACTUAL STORIES EXIST.**
+
+### [Time Period FROM ACTUAL STORY DATES]: [Phase Name]
+Write 2-3 paragraphs describing:
+- What was happening and WHERE (counties FROM STORIES)?
+- Regional differences in how issues emerged (FROM STORIES)
+- Who was involved in each county? (NAMES FROM STORIES)
+
+**If story coverage doesn't span multiple years, adjust sections accordingly or note: "Coverage concentrated in [specific period]."**
+
+[Continue for time periods with actual coverage]
+
+---
+
+## MAJOR THEMES: The Continuing Stories
+
+**ONLY INCLUDE THEMES THAT ACTUALLY EMERGE FROM THE STORIES.**
+
+For each theme EVIDENT IN MULTIPLE STORIES:
+
+### Theme 1: [Specific Theme Name FROM COVERAGE]
+
+Write 3-4 paragraphs covering:
+- How this theme manifests differently across counties (FROM STORIES)
+- Which counties are most affected? (BASED ON STORIES)
+- Specific examples from different locations (FROM STORIES)
+- How geography shapes the issue (IF DISCUSSED IN STORIES)
+
+**If fewer than 3 clear themes emerge, include only those that are well-supported by actual stories.**
+
+---
+
+## COVERAGE ANALYSIS: What Gets Told, What Gets Missed
+
+**Geographic Coverage Patterns:**
+Write 2-3 paragraphs on (BASED ON ACTUAL STORY DISTRIBUTION):
+- Which counties get the most coverage? (count from actual stories)
+- Which are underreported? (few/no stories)
+- Urban vs. rural coverage disparities (from actual story locations)
+- How county demographics correlate with coverage intensity (if discernible)
+
+**Source Diversity by County:**
+| County | Most Common Sources | Underrepresented Voices |
+|--------|-------------------|------------------------|
+| [County FROM STORIES] | [Types quoted in actual stories] | [Types rarely/never quoted] |
+
+**The Geographic Gaps:**
+- Specific towns/areas getting no coverage (gaps in actual stories)
+- Rural vs. urban disparities (from actual coverage)
+- Why certain counties are invisible (if there's evidence)
+
+---
+
+## REPORTER'S TOOLKIT
+
+### Essential Background
+
+Write 2-3 paragraphs on (FROM STORY CONTENT):
+- Regional history of race and diversity (as covered in stories)
+- How the Eastern Shore differs from rest of Maryland (if discussed)
+- Economic and political factors by county (as mentioned in stories)
+
+**If background context is thin in stories, note it.**
+
+### County Quick Reference
+
+**ONLY INCLUDE COUNTIES MENTIONED IN STORIES:**
+
+**[County Name FROM STORIES]:**
+- Population: [if mentioned in stories, otherwise "Not specified in coverage"]
+- Racial composition: [if in stories, otherwise "Not specified"]
+- Main towns: [from stories]
+- Key issues: [from actual coverage]
+- Media landscape: [if mentioned]
+- Community gathering places: [if mentioned]
+
+[Repeat for counties with actual coverage]
+
+### Sensitivities & Interview Tips by Region
+
+Write about (BASED ON PATTERNS IN ACTUAL STORIES):
+- County-specific concerns (evident from coverage)
+- Historical traumas in specific places (if referenced in stories)
+- Building trust in different communities (if discussed)
+- Good questions for each type of source (based on how they're quoted)
+
+---
+
+## STORY IDEAS: Where to Go Next
+
+**County-Specific Opportunities:**
+
+For each underreported county or issue (BASED ON GAPS IN ACTUAL COVERAGE):
+- What's the story angle? (building on what IS covered)
+- Which specific town/neighborhood? (mentioned but undercovered)
+- Who would you interview? (name specific community sources FROM EARLIER SECTION WHO WERE IN ACTUAL STORIES)
+- What gap does it fill? (gap in actual coverage)
+
+**Comparative Stories:**
+- Ideas that compare counties (based on actual coverage patterns)
+- Regional patterns worth exploring (evident from stories)
+- Cross-county collaborations or conflicts (if mentioned)
+
+---
+
+CRITICAL REQUIREMENTS:
+
+1. **GEOGRAPHIC FOCUS**: County breakdown is THE PRIORITY - most detailed section
+2. **COMMUNITY SOURCES**: Only non-governmental sources in the directory
+3. **GLOSSARY**: Comprehensive and categorized
+4. **SPECIFIC DETAILS**: Use REAL NAMES, ACTUAL PLACES, EXACT DATES from summaries
+5. **NO PLACEHOLDERS**: Don't write "[Name]" or "[County]" - use actual information
+6. **DEMOGRAPHIC DATA**: Include specific numbers/percentages when available
+7. **ACCESSIBILITY**: Clear, scannable format for quick county reference
+
+**MOST CRITICAL REQUIREMENT:**
+**DO NOT FABRICATE OR INVENT ANY INFORMATION.**
+- Every name must be from the summaries
+- Every event must be from the summaries  
+- Every date must be from the summaries
+- Every organization must be from the summaries
+- Every statistic must be from the summaries
+
+**If information is missing, say so. DO NOT FILL GAPS WITH MADE-UP CONTENT.**
+
+When in doubt, write less and stick to what's actually in the source material.
+
+SUMMARIES TO SYNTHESIZE:
+""" + combined + """
+
+---
+
+CREATE THE COUNTY-FOCUSED BEAT BOOK (USING ONLY INFORMATION FROM THESE SUMMARIES):"""
+    
+    print("Synthesizing county-focused guide...", file=sys.stderr)
+    response = model.prompt(prompt)
+    result = response.text()
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Generate a county-focused Beat Book for Maryland Eastern Shore (ONLY from source stories - NO fabrication)'
+    )
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='Path to JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide_county.md',
+                       help='Output file (default: reporter_guide_county.md)')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', 
+                       default='groq/openai/gpt-oss-120b',
+                       choices=[
+                           'groq/openai/gpt-oss-20b',
+                           'groq/openai/gpt-oss-120b',
+                           'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                           'groq/moonshotai/kimi-k2-instruct-0905',
+                           'groq/qwen/qwen3-32b'
+                       ],
+                       help='LLM model to use (default: gpt-oss-120b)')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--summaries-only', action='store_true',
+                       help='Save batch summaries without synthesis')
+    parser.add_argument('--debug', action='store_true',
+                       help='Save intermediate outputs')
+    parser.add_argument('--max-consolidate', type=int, default=3,
+                       help='Max summaries to consolidate at once (default: 3)')
+    
+    args = parser.parse_args()
+    
+    use_qwen = args.model == 'groq/qwen/qwen3-32b' if args.model else False
+    
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    print(f"CRITICAL: Will ONLY use information from stories in {args.input_file}", file=sys.stderr)
+    print(f"NO FABRICATION of names, events, or data will be allowed", file=sys.stderr)
+    
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict) and 'stories' in data:
+        stories = data['stories']
+    elif isinstance(data, dict) and 'articles' in data:
+        stories = data['articles']
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    print(f"FOCUS: County-by-county breakdown with community sources", file=sys.stderr)
+    print(f"SOURCE: ONLY {args.input_file} - NO external information", file=sys.stderr)
+    if use_qwen:
+        print("NOTE: Qwen model - will strip <think> tags", file=sys.stderr)
+    
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, use_qwen)
+        batch_summaries.append(summary)
+        
+        if args.debug:
+            debug_file = f"debug_batch_{batch_num:03d}.md"
+            with open(debug_file, 'w') as f:
+                f.write(summary)
+            print(f"  Saved: {debug_file}", file=sys.stderr)
+    
+    if args.debug:
+        total_chars = sum(len(s) for s in batch_summaries)
+        total_words = sum(len(s.split()) for s in batch_summaries)
+        print(f"\nDEBUG: Total summaries:", file=sys.stderr)
+        print(f"  {total_chars:,} characters", file=sys.stderr)
+        print(f"  {total_words:,} words", file=sys.stderr)
+        print(f"  ~{total_words * 1.3:.0f} tokens (estimate)", file=sys.stderr)
+    
+    if args.summaries_only:
+        output_file = args.output.replace('.md', '_summaries.md')
+        with open(output_file, 'w') as f:
+            for i, summary in enumerate(batch_summaries, 1):
+                f.write(f"\n\n## Batch {i}\n\n{summary}\n")
+        print(f"Batch summaries saved to {output_file}", file=sys.stderr)
+        return
+    
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_summaries_per_level=args.max_consolidate, 
+                           use_qwen=use_qwen)
+    
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore - County-by-County Guide (2024-2025)\n\n")
+        f.write(f"**SOURCE: Information extracted ONLY from stories in {args.input_file}**\n")
+        f.write(f"**NO fabricated names, events, or data included**\n\n")
+        f.write("---\n\n")
+        f.write(guide)
+    
+    print(f"\nCounty-Focused Beat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+    print(f"  PRIMARY FOCUS: Geographic/county breakdown with racial demographics", file=sys.stderr)
+    print(f"  SOURCES: Community-based (no government officials)", file=sys.stderr)
+    print(f"  INCLUDES: Comprehensive glossary of terms", file=sys.stderr)
+    print(f"  DATA SOURCE: ONLY {args.input_file} - no fabrication", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()
