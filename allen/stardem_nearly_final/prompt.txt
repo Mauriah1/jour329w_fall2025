@@ -1,0 +1,250 @@
+"""
+Generate reporter's guide from source_stories_final.json
+Two-pass: extract then synthesize. Geographic/county focus.
+CRITICAL: Only use story info - NO fabrication.
+"""
+
+import json
+import llm
+import sys
+import re
+from pathlib import Path
+
+
+def get_model(model_name=None):
+    """Get the LLM model to use."""
+    if model_name:
+        return llm.get_model(model_name)
+    return llm.get_model()
+
+
+def load_reference_doc(reference_file):
+    """Load reference document with important people/organizations."""
+    if not reference_file or not Path(reference_file).exists():
+        return None
+    with open(reference_file, 'r') as f:
+        content = f.read()
+    print(f"Loaded reference: {reference_file}", file=sys.stderr)
+    return content
+
+
+def extract_from_batch(stories, batch_num, model, reference_context=None):
+    """Extract key information from batch of stories."""
+    essential_stories = []
+    for i, story in enumerate(stories, 1):
+        essential = f"Story {i}:\n"
+        if isinstance(story, dict):
+            for field in ['title', 'headline', 'date', 'published', 'url', 'source']:
+                if field in story:
+                    essential += f"{field.title()}: {story[field]}\n"
+            for field in ['content', 'text']:
+                if field in story:
+                    essential += f"{field.title()}: {str(story[field])[:500]}...\n"
+        essential += "\n"
+        essential_stories.append(essential)
+    
+    stories_text = "\n".join(essential_stories)
+    ref_note = f"\n**HIGH PRIORITY (3+):** {reference_context[:1000]}\n" if reference_context else ""
+    
+    prompt = f"""Extract from {len(stories)} MD Shore stories. ONLY explicit info.
+{ref_note}
+Get: Counties/demographics, Themes by county (2-3 sent), LOCAL sources: Name (Role) [HIGH PRIORITY if above, count], Orgs [HIGH PRIORITY if above, count], Events: County: Date: Desc (count/county), Shore terms ONLY, Keywords/race framing, Story refs
+
+STORIES:
+{stories_text}
+
+EXTRACT:"""
+    
+    print(f"Processing batch {batch_num}...", file=sys.stderr)
+    
+    try:
+        response = model.prompt(prompt)
+        return response.text()
+    except Exception as e:
+        if "413" in str(e) or "rate_limit" in str(e):
+            print(f"⚠️  Batch {batch_num} limit exceeded, using gpt-oss-20b...", file=sys.stderr)
+            fallback = get_model("groq/openai/gpt-oss-20b")
+            return fallback.prompt(prompt).text()
+        raise
+
+
+def synthesize_intermediate(summaries, level, model):
+    """Consolidate summaries at intermediate level."""
+    combined = "\n\n---\n\n".join(f"S{i+1}:\n{s}" for i, s in enumerate(summaries))
+    
+    prompt = f"""Consolidate {len(summaries)} by COUNTY. ONLY what's here.
+
+Combine: Counties (demographics, issues), Sources (name, role, [HIGH PRIORITY], counts), Orgs ([HIGH PRIORITY], counts), Themes, Events (county, date), Shore terms, Keywords
+
+{combined}
+
+RESULT:"""
+    
+    print(f"Consolidating level {level} ({len(summaries)} summaries)...", file=sys.stderr)
+    
+    try:
+        return model.prompt(prompt).text()
+    except Exception as e:
+        if "413" in str(e) or "rate_limit" in str(e):
+            print(f"⚠️  Level {level} limit exceeded, using gpt-oss-20b...", file=sys.stderr)
+            fallback = get_model("groq/openai/gpt-oss-20b")
+            return fallback.prompt(prompt).text()
+        raise
+
+
+def synthesize_guide(batch_summaries, topic, model, max_per_level=2, reference_content=None):
+    """Synthesize batch summaries into final beat book."""
+    if len(batch_summaries) <= max_per_level:
+        combined = "\n\n---\n\n".join(f"BATCH {i+1}:\n{s}" for i, s in enumerate(batch_summaries))
+    else:
+        current_level = batch_summaries
+        level = 1
+        while len(current_level) > max_per_level:
+            next_level = []
+            for i in range(0, len(current_level), max_per_level):
+                group = current_level[i:i+max_per_level]
+                consolidated = synthesize_intermediate(group, level, model)
+                next_level.append(consolidated)
+            current_level = next_level
+            level += 1
+        combined = "\n\n---\n\n".join(f"SEC {i+1}:\n{s}" for i, s in enumerate(current_level))
+    
+    ref_inst = f"\n**HIGH PRIORITY (3+):** {reference_content[:1200]} Mark ⭐.\n" if reference_content else ""
+    
+    prompt = f"""Beat Book: {topic} - MD Shore 2024-25. ONLY summaries. LOCAL leaders.
+{ref_inst}
+Shore: Talbot, Dorchester, Kent, Queen Anne's, Caroline, Wicomico, Somerset, Worcester
+
+OPENING (2-3 para): History, 2024-25 changes, geography
+COUNTY-BY-COUNTY: 2+ events. Shore=full, non-Shore=brief [NAME] (Outside Shore)
+Per Shore (1 narrative, 3-4 para): Demographics, issues, events (CHRONO), LOCAL (⭐ HIGH PRIORITY), towns, unique
+CENSUS: Race/eth %, poverty, healthcare, edu by county. Missing="Census not in source"
+RACE COVERAGE: Keywords (2-3 para), Examples (title/URL/quote), Patterns, Table: Keyword|Freq|Context|Example
+GLOSSARY: Shore terms. Tables: Local/Cultural Terms, Orgs/Acronyms. Usage (1-2 para)
+SOURCES DIR: By county bullets - Activists, Faith, Historians, Nonprofits, Educators, Business, Residents
+⭐ **Name** - Role - Why important - Contact (3+) | **Name** - Role - Reliable - Contact. LOCAL. "Resident" not "servant"
+KEY PLAYERS (3+): 2-3 sent - who, role, why, stories, contact. Local priority
+ORGS (3+): 2-3 sent - what, why, contact. Shore presence
+STORY ARCS: By period 2-3 para - what/where, who. CHRONO. Pivotal by date
+THEMES: 3-4 para - across counties, examples, refs. Note spikes
+ANALYSIS: Geographic (2-3 para), Source Diversity (types, missing, by county - synthesize), Gaps
+STORY IDEAS: County (4-6 sent, DIFF, LOCAL), Comparative (2-3 para, DIFF), Follow-Up (2-3 para, DIFF)
+
+Rules: Real names/dates, NO abbrev, Tables=Glossary/Sources, Local>state, 1 narrative/county, 2+ events, Chrono, Label non-Shore, No "servant", Shore glossary, ⭐=3+, "why" HIGH PRIORITY
+
+SUMMARIES:
+{combined}
+
+CREATE:"""
+    
+    print("Synthesizing guide...", file=sys.stderr)
+    
+    try:
+        return model.prompt(prompt).text()
+    except Exception as e:
+        if "413" in str(e) or "rate_limit" in str(e):
+            print(f"⚠️  Final generation limit exceeded, using gpt-oss-20b...", file=sys.stderr)
+            fallback = get_model("groq/openai/gpt-oss-20b")
+            return fallback.prompt(prompt).text()
+        raise
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate Beat Book for MD Eastern Shore')
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide_county.md',
+                       help='Output file (default: reporter_guide_county.md)')
+    parser.add_argument('-r', '--reference', default=None,
+                       help='Reference markdown with important people/orgs')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', default='groq/openai/gpt-oss-120b',
+                       choices=['groq/openai/gpt-oss-20b', 'groq/openai/gpt-oss-120b',
+                               'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                               'groq/moonshotai/kimi-k2-instruct-0905', 'groq/qwen/qwen3-32b'],
+                       help='LLM model (default: gpt-oss-120b)')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--max-consolidate', type=int, default=2,
+                       help='Max summaries per consolidation (default: 2)')
+    
+    args = parser.parse_args()
+    
+    # Load reference document if provided
+    reference_content = None
+    if args.reference:
+        reference_content = load_reference_doc(args.reference)
+    
+    # Load and validate stories from JSON
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    print(f"CRITICAL: ONLY info from {args.input_file} - NO fabrication", file=sys.stderr)
+    
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict):
+        stories = data.get('stories') or data.get('articles')
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    print(f"MINIMAL PROMPTS: Consolidates 2 at a time to avoid token limits", file=sys.stderr)
+    print(f"FOCUS: County-by-county with LOCAL sources", file=sys.stderr)
+    print(f"PRIORITY: 3+ mentions marked ⭐", file=sys.stderr)
+    
+    # Process stories in batches
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    reference_context = reference_content[:1000] if reference_content else None
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, reference_context)
+        batch_summaries.append(summary)
+    
+    # Synthesize final guide from batch summaries
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_per_level=args.max_consolidate, 
+                           reference_content=reference_content)
+    
+    # Write final beat book to output file
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore - County-by-County Guide (2024-2025)\n\n")
+        f.write(f"**SOURCE: Information extracted ONLY from stories in {args.input_file}**\n")
+        f.write(f"**NO fabricated names, events, or data included**\n")
+        if reference_content:
+            f.write(f"**HIGH PRIORITY SOURCES: People/organizations mentioned 3+ times marked with ⭐**\n")
+        f.write("\n---\n\n")
+        f.write(guide)
+    
+    print(f"\nBeat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+    print(f"  FOCUS: Eastern Shore counties with LOCAL leaders", file=sys.stderr)
+    print(f"  HIGH PRIORITY: Sources 3+ mentions marked ⭐", file=sys.stderr)
+    print(f"  INCLUDES: Census data, keywords, story arcs", file=sys.stderr)
+    print(f"  SOURCE: ONLY {args.input_file} - no fabrication", file=sys.stderr)
+
+
+if __name__ == '__main__':
+    main()
