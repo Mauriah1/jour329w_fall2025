@@ -1,0 +1,307 @@
+ Create a narrative beat guide for a reporter new Eastern Shore Maryland. Write it in a conversational, mentorship tone - like a veteran reporter sitting down with a newcomer to explain how this beat actually works. Use the data from from source_stories_final.json
+Two-pass: extract then synthesize. Geographic/county focus.
+CRITICAL: Only use story info - NO fabrication.
+**CRITICAL**: Prioritize LOCAL knowledge and sources over generic beat reporting advice. This guide should be deeply rooted in the Shore's eight counties: Talbot, Dorchester, Kent, Queen Anne's, Caroline, Wicomico, Somerset, Worcester.
+
+Complete 10-Section Structure for Maryland Eastern Shore Race & Diversity Beat Guide
+
+SECTION 1: Understanding the Race Beat on the Eastern Shore
+------------------------------------------------------------
+- Narrative overview (2-3 paragraphs)
+- What covering race and diversity on the Shore means day-to-day
+- Major story threads from 2024-2025
+- What makes the Shore different from urban coverage
+- The rhythm of this beat across eight counties
+
+SECTION 2: The Players You'll Get to Know
+------------------------------------------
+- Stories about LOCAL people, not just names (3-4 paragraphs)
+- Power dynamics and institutional influence
+- Community voices: activists, organizers, faith leaders, residents
+- Organizations that shape coverage
+- Practical tips woven in: "When X happens, call Y..."
+- WHY sources matter, not just who they are
+- ⭐ marks sources mentioned 3+ times
+
+SECTION 3: How Stories Get Written Here
+----------------------------------------
+- Analysis of writing patterns and coverage (3-4 paragraphs)
+- What makes a strong Shore race/diversity story
+- Sourcing strategies: who gets quoted, in what order, why
+- Specific examples from story titles, URLs, quotes
+- How Shore coverage differs from urban reporting
+- Keywords and frames that appear most often
+
+SECTION 4: Building Your Beat
+------------------------------
+- HOW to develop the beat from day one (3-4 paragraphs)
+- How to build source relationships (not just who they are)
+- What records to request, when, and why
+- Balancing reactive coverage with deeper investigation
+- Concrete advice: "Every Monday, check..." "When you hear X..."
+- Navigating eight-county geography
+- Institutional knowledge to build
+
+SECTION 5: County-by-County Breakdown
+--------------------------------------
+For EACH of the eight Shore counties:
+- One rich narrative section (3-4 paragraphs per county)
+- What makes this county tick: demographics, issues, character
+- Towns and communities to cover
+- Key 2024-25 events in CHRONOLOGICAL ORDER
+- LOCAL people who matter here (⭐ for 3+ mentions) and WHY
+- County-specific reporting tips
+- Census data woven in naturally
+- Flowing narrative, not lists: "In Caroline County, you'll find..."
+
+The eight counties: Talbot, Dorchester, Kent, Queen Anne's, Caroline, 
+Wicomico, Somerset, Worcester
+
+SECTION 6: Stories Waiting to Be Told
+--------------------------------------
+- 3-5 story ideas as narrative pitches (full paragraphs each)
+- The angle and why it matters
+- Who to talk to first (LOCAL sources)
+- What documents will unlock it
+- Reporting process: "Start by..., then..., watch out for..."
+- County-specific and comparative angles
+- Different from what's already been covered
+
+SECTION 7: Themes Across Counties
+----------------------------------
+- Major themes from the summaries (3-4 paragraphs)
+- Issues that appear across multiple counties
+- How themes connect
+- Coverage spikes and patterns
+- Specific examples from specific places
+- How themes echo or differ by county
+
+SECTION 8: Story Arcs - How the Year Unfolded
+----------------------------------------------
+- Break coverage into chronological periods from 2024-2025
+- For each period (2-3 paragraphs): what was happening and where
+- Who was driving the story
+- Pivotal moments with specific dates
+- How stories built on each other over time
+- Track how themes evolved throughout the year
+- Show the narrative thread connecting related coverage
+
+This section helps reporters understand the chronological development of 
+major stories and spot follow-up opportunities.
+
+SECTION 9: Coverage Analysis
+-----------------------------
+- Patterns and gaps analysis (3-4 paragraphs)
+- Which counties get more coverage and why
+- What types of sources appear most
+- Voice diversity: who dominates, who's missing
+- Source diversity across counties (synthesized patterns)
+- Missing story angles and follow-up needs
+- Geographic and demographic gaps
+
+SECTION 10: A Day-to-Day - What It May Look Like for You
+---------------------------------------------------------
+- Practical guidance on daily rhythm (2-3 paragraphs)
+- What a typical week looks like
+- Morning routines: what to check, who to call
+- How to divide time between counties
+- Balancing daily coverage with enterprise work
+- Building/maintaining source relationships across eight counties
+- Big news vs. quiet news days
+
+SECTION 11: Navigating Sensitivities & Interview Tipsas 2-3 narrative paragraphs covering:
+
+Talbot: ICE activism & Frederick Douglass trauma
+Calvert/Sussex: Hate crimes involving minors
+Cambridge: Native American respectful language
+Caroline: LGBTQ & Juneteenth intersections
+Turner Station: Vandalism & healing initiatives
+---------------------------------------------------------
+KEY FEATURES
+============
+
+✓ Conversational, mentorship tone throughout
+  - Direct address: "you'll find that...", "when covering X..."
+  - Like a veteran reporter explaining the beat over coffee
+
+✓ NO tables or glossary
+  - All information integrated into narrative prose
+  - Examples woven naturally into paragraphs
+
+✓ Prioritizes LOCAL knowledge
+  - Community activists, organizers, residents over state politicians
+  - Sources marked with ⭐ if mentioned 3+ times
+  - Focus on WHY sources matter, not just who they are
+
+✓ County-by-county depth
+  - Rich narratives for each Shore county (3-4 paragraphs each)
+  - Specific events, people, tips per county
+  - Census data integrated naturally
+
+✓ Voice-driven and practical
+  - Short paragraphs, specific examples
+  - Something a reporter would actually want to read
+  - Actionable advice throughout
+
+✓ Output format: .txt file
+  - Plain text format for easy reading and reference
+
+  CREATE THE GUIDE:"""
+    
+    print("Synthesizing county-focused guide with HIGH PRIORITY sources...", file=sys.stderr)
+    
+    try:
+        response = model.prompt(prompt)
+        result = response.text()
+    except Exception as e:
+        if "413" in str(e) or "rate_limit" in str(e) or "too large" in str(e).lower():
+            print(f"⚠️  Token limit exceeded in final generation, falling back to gpt-oss-20b...", file=sys.stderr)
+            fallback_model = get_model("groq/openai/gpt-oss-20b")
+            response = fallback_model.prompt(prompt)
+            result = response.text()
+        else:
+            raise
+    
+    if use_qwen:
+        result = clean_qwen_output(result)
+    
+    return result
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Generate a county-focused Beat Book for Maryland Eastern Shore (ONLY from source stories - NO fabrication)'
+    )
+    parser.add_argument('input_file', nargs='?', default='source_stories_final.json',
+                       help='Path to JSON file (default: source_stories_final.json)')
+    parser.add_argument('-o', '--output', default='reporter_guide_county.txt',
+                       help='Output file (default: reporter_guide_county.txt)')
+    parser.add_argument('-r', '--reference', default=None,
+                       help='Path to reference markdown with important people/orgs (optional)')
+    parser.add_argument('-b', '--batch-size', type=int, default=15,
+                       help='Stories per batch (default: 15)')
+    parser.add_argument('-m', '--model', 
+                       default='groq/meta-llama/llama-3.3-70b-versatile',
+                       choices=[
+                           'groq/openai/gpt-oss-20b',
+                           'groq/openai/gpt-oss-120b',
+                           'groq/meta-llama/llama-3.3-70b-versatile',
+                           'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+                           'groq/moonshotai/kimi-k2-instruct-0905',
+                           'groq/qwen/qwen3-32b'
+                       ],
+                       help='LLM model to use (default: llama-3.3-70b-versatile)')
+    parser.add_argument('-t', '--topic', default='Race & Diversity',
+                       help='Topic name (default: Race & Diversity)')
+    parser.add_argument('--summaries-only', action='store_true',
+                       help='Save batch summaries without synthesis')
+    parser.add_argument('--debug', action='store_true',
+                       help='Save intermediate outputs')
+    parser.add_argument('--max-consolidate', type=int, default=3,
+                       help='Max summaries to consolidate at once (default: 3)')
+    
+    args = parser.parse_args()
+    
+    use_qwen = args.model == 'groq/qwen/qwen3-32b' if args.model else False
+    
+    # Load reference document if provided
+    reference_content = None
+    if args.reference:
+        reference_content = load_reference_doc(args.reference)
+    
+    print(f"Loading stories from {args.input_file}...", file=sys.stderr)
+    print(f"CRITICAL: Will ONLY use information from stories in {args.input_file}", file=sys.stderr)
+    print(f"NO FABRICATION of names, events, or data will be allowed", file=sys.stderr)
+    
+    try:
+        with open(args.input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if isinstance(data, list):
+        stories = data
+    elif isinstance(data, dict) and 'stories' in data:
+        stories = data['stories']
+    elif isinstance(data, dict) and 'articles' in data:
+        stories = data['articles']
+    else:
+        print("Error: JSON structure not recognized.", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"Loaded {len(stories)} stories", file=sys.stderr)
+    
+    model = get_model(args.model)
+    print(f"Using model: {model.model_id}", file=sys.stderr)
+    print(f"FOCUS: County-by-county breakdown with LOCAL community sources", file=sys.stderr)
+    print(f"INCLUDES: Keyword/framing analysis and census data section", file=sys.stderr)
+    print(f"PRIORITY: People/orgs mentioned 3+ times (marked with ⭐)", file=sys.stderr)
+    print(f"SOURCE: ONLY {args.input_file} - NO external information", file=sys.stderr)
+    if use_qwen:
+        print("NOTE: Qwen model - will strip <think> tags", file=sys.stderr)
+    
+    batch_summaries = []
+    num_batches = (len(stories) + args.batch_size - 1) // args.batch_size
+    
+    print(f"Processing {num_batches} batches (size: {args.batch_size})", file=sys.stderr)
+    
+    # Pass reference context to extraction phase
+    reference_context = reference_content[:2000] if reference_content else None
+    
+    for i in range(0, len(stories), args.batch_size):
+        batch = stories[i:i+args.batch_size]
+        batch_num = i // args.batch_size + 1
+        summary = extract_from_batch(batch, batch_num, model, use_qwen, reference_context)
+        batch_summaries.append(summary)
+        
+        if args.debug:
+            debug_file = f"debug_batch_{batch_num:03d}.md"
+            with open(debug_file, 'w') as f:
+                f.write(summary)
+            print(f"  Saved: {debug_file}", file=sys.stderr)
+    
+    if args.debug:
+        total_chars = sum(len(s) for s in batch_summaries)
+        total_words = sum(len(s.split()) for s in batch_summaries)
+        print(f"\nDEBUG: Total summaries:", file=sys.stderr)
+        print(f"  {total_chars:,} characters", file=sys.stderr)
+        print(f"  {total_words:,} words", file=sys.stderr)
+        print(f"  ~{total_words * 1.3:.0f} tokens (estimate)", file=sys.stderr)
+    
+    if args.summaries_only:
+        output_file = args.output.replace('.md', '_summaries.md')
+        with open(output_file, 'w') as f:
+            for i, summary in enumerate(batch_summaries, 1):
+                f.write(f"\n\n## Batch {i}\n\n{summary}\n")
+        print(f"Batch summaries saved to {output_file}", file=sys.stderr)
+        return
+    
+    guide = synthesize_guide(batch_summaries, args.topic, model, 
+                           max_summaries_per_level=args.max_consolidate, 
+                           use_qwen=use_qwen,
+                           reference_content=reference_content)
+    
+    with open(args.output, 'w') as f:
+        f.write(f"# Reporter's Beat Book: {args.topic}\n")
+        f.write(f"## Maryland's Eastern Shore - County-by-County Guide (2024-2025)\n\n")
+        f.write(f"**SOURCE: Information extracted ONLY from stories in {args.input_file}**\n")
+        f.write(f"**NO fabricated names, events, or data included**\n")
+        if reference_content:
+            f.write(f"**HIGH PRIORITY SOURCES: People/organizations mentioned 3+ times marked with ⭐**\n")
+        f.write("\n---\n\n")
+        f.write(guide)
+    
+    print(f"\nCounty-Focused Beat Book saved to {args.output}", file=sys.stderr)
+    print(f"  Processed {len(stories)} stories in {num_batches} batches", file=sys.stderr)
+    print(f"  PRIMARY FOCUS: Eastern Shore counties with LOCAL community leaders", file=sys.stderr)
+    print(f"  HIGH PRIORITY: Sources mentioned 3+ times marked with ⭐", file=sys.stderr)
+    print(f"  INCLUDES: Census data, keyword analysis, chronological story arcs", file=sys.stderr)
+    print(f"  DATA SOURCE: ONLY {args.input_file} - no fabrication", file=sys.stderr)
+
+if __name__ == '__main__':
+    main()
