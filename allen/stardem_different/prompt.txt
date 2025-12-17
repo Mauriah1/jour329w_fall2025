@@ -1,51 +1,195 @@
-#!/usr/bin/env python3
-"""
-Run: python3 prompt.txt
-"""
-import json, os
-from groq import Groq
+# NEW PROMPT: Event Calendar-Style Beat Book
 
-# YOUR PROMPT
-PROMPT = """
+prompt = f"""
 You are creating a BEAT CALENDAR & REFERENCE GUIDE for a race/diversity reporter covering Maryland's Eastern Shore.
 
-**SOURCE MATERIAL:** Use ONLY the stories provided below
+**SOURCE MATERIAL:** Use ONLY the stories in source_stories_final.json
 **FORMAT:** Event calendar style with quick-reference sections (NOT narrative prose)
 **NO FABRICATION:** Use only names, events, dates, and details explicitly found in the source stories
 
+---
+
 ## REQUIRED SECTIONS:
 
-1. ANNUAL EVENT CALENDAR - chronological with dates, locations, contacts, story angles
-2. RECURRING COVERAGE OPPORTUNITIES - by theme (heritage months, pride, voting, indigenous)
-3. HIGH-PRIORITY SOURCE DIRECTORY - contact cards with ⭐ for 3+ mentions
-4. COUNTY-BY-COUNTY QUICK FACTS - demographics, organizations, recent stories, gaps
-5. STORY TRACKER LOG - table of past coverage
-6. BREAKING NEWS CONTACTS - organized by issue type
-7. HISTORICAL MILESTONES - timeline format
-8. STORY IDEA GENERATOR - watchdog, human interest, trends, anniversaries
-9. GLOSSARY OF TERMS - Shore-specific only
-10. COVERAGE GAPS & OPPORTUNITIES
+### 1. ANNUAL EVENT CALENDAR
+Format as a chronological calendar showing:
+- Event name
+- Date (if specific) or Month
+- Location (County/City)
+- Key contacts/organizations involved
+- Brief description (1-2 sentences max)
+- Story potential/angle
 
-Use emojis (📍📰👤📅⭐), bullet points, tables. NO long paragraphs or narrative.
+Example format:
+```
+FEBRUARY
+Black History Month Planning (Dec-Feb)
+📍 Talbot County
+👤 Contact: Easton Economic Development Corporation
+📋 Multiple cultural heritage programs, MLK breakfasts
+📰 Story angle: Measure community participation, economic impact
+
+MLK Day Breakfast (Jan 17)
+📍 Washington College (Kent County)
+👤 Contact: Minary's Dream Alliance, Chester Valley Ministers
+📋 Annual commemoration, student involvement, service awards
+📰 Story angle: Interview award recipients, youth perspectives
+```
+
+### 2. RECURRING COVERAGE OPPORTUNITIES
+Group by theme/season:
+- HERITAGE MONTHS (with specific Shore activities)
+- PRIDE EVENTS (by county)
+- VOTING RIGHTS ANNIVERSARIES
+- INDIGENOUS OBSERVANCES
+- CULTURAL CELEBRATIONS
+
+### 3. HIGH-PRIORITY SOURCE DIRECTORY
+Organize as quick-reference contact cards:
+
+**CIVIL RIGHTS & VOTING**
+⭐ Carl Snowden (3+ mentions)
+- Role: Caucus of African American Leaders Convener
+- Why essential: Primary organizer for voting rights, DEI debates
+- Counties active: Talbot, Dorchester, Caroline
+- Recent stories: Federalsburg settlement, Malkus Bridge campaign
+- Contact: [blank for reporter]
+
+**LATINO/IMMIGRANT SERVICES**
+⭐ Chesapeake Multicultural Resource Center (3+ mentions)
+- Key staff: Victoria Gómez Lozano (Deputy Director)
+- Service area: Multi-county Shore coverage
+- Annual clients: 3,500+
+- Recent stories: Immigration services, Posada celebration
+- Contact: [blank for reporter]
+
+### 4. COUNTY-BY-COUNTY QUICK FACTS
+For each county, provide:
+- Population demographics (if mentioned in stories)
+- Key organizations (with ⭐ for 3+ mentions)
+- Recent major stories (with dates)
+- Story gaps/opportunities
+- Sensitive topics to handle carefully
+
+Example:
+```
+TALBOT COUNTY (Easton)
+Recent stories: 15 (most active county)
+Key themes: DEI debates, Douglass legacy, Pride controversies
+⭐ High-priority: Carl Snowden, Caucus of African American Leaders
+
+MAJOR EVENTS:
+- Apr 7, 2024: $260K voting-rights settlement
+- Jun 5, 2024: Delmarva Pride Festival
+- Feb 17, 2024: "Troubled Waters" Black watermen panel
+
+STORY GAPS: 
+- Limited coverage of Asian American community
+- Follow-up needed on DEI resolution outcome
+
+SENSITIVITY NOTES:
+- ICE activism may evoke trauma; approach with care
+- Frederick Douglass narrative is source of pride
+```
+
+### 5. STORY TRACKER LOG (Past Coverage)
+Create a table showing:
+| Date | Headline/Topic | County | Key Sources | Follow-up Needed? |
+|------|----------------|---------|-------------|-------------------|
+
+### 6. BREAKING NEWS CONTACTS
+Quick list organized by issue:
+**IMMIGRATION/ICE:**
+**HATE CRIMES:**
+**VOTING RIGHTS:**
+**LGBTQ+ ISSUES:**
+**INDIGENOUS AFFAIRS:**
+
+### 7. HISTORICAL MILESTONES (Timeline Format)
+Key dates journalists should know:
+```
+1848 - Pearl escape attempt
+1865 - Juneteenth (June 19)
+1960s - Cambridge Movement
+2023 - Federalsburg first Black council members elected (Sept 26)
+2024 - Just Communities designation
+```
+
+### 8. STORY IDEA GENERATOR
+Organized by type:
+**WATCHDOG (Accountability):**
+**HUMAN INTEREST (Profiles/Features):**
+**TREND (Analysis):**
+**ANNIVERSARY (Pegs):**
+
+### 9. GLOSSARY OF TERMS
+ONLY include:
+- Shore-specific place names with cultural significance
+- Local organizational acronyms
+- Historical terms unique to the region
+(If insufficient terms exist in source material, note: "Limited local terminology captured in source coverage")
+
+### 10. COVERAGE GAPS & OPPORTUNITIES
+**UNDERREPORTED COUNTIES:**
+**UNDERREPORTED COMMUNITIES:**
+**SEASONAL OPPORTUNITIES:**
+
+---
+
+## FORMATTING RULES:
+
+✅ USE:
+- Bullet points, tables, calendar grids
+- Emojis for visual scanning (📍📰👤📅⭐)
+- Bold for key names/organizations
+- Date stamps for everything
+- "⭐" to mark high-priority sources (3+ mentions)
+
+❌ AVOID:
+- Long paragraphs
+- Narrative storytelling
+- Flowery descriptions
+- Editorial commentary
+
+## CRITICAL REMINDERS:
+
+1. **NO FABRICATION**: Every name, date, event, quote must be in source_stories_final.json
+2. **SOURCE ATTRIBUTION**: When referencing specific stories, include date
+3. **HIGH-PRIORITY MARKERS**: Use ⭐ for people/orgs mentioned 3+ times
+4. **CONTACT INFO**: Leave blank fields for reporter to fill in (phone/email)
+5. **ACCURACY OVER COMPLETENESS**: If data doesn't exist in sources, note the gap
+
+---
+
+Generate the beat calendar/reference guide now using the stories in source_stories_final.json.
 """
+"""
+Run prompt.txt with Groq gpt-oss-120b model
+Usage: python3 run.py
+"""
+import json
+import os
+from groq import Groq
 
-# Load stories and run
-print("🚀 Running with Groq llama-3.3-70b-versatile model...")
-stories = json.load(open('source_stories_final.json'))
+# Load your prompt.txt
+with open('prompt.txt', 'r') as f:
+    prompt = f.read()
+
+# Load stories
+with open('source_stories_final.json', 'r') as f:
+    stories = json.load(f)
+
+print("🚀 Running prompt.txt with Groq gpt-oss-120b model...")
 print(f"📊 Processing {len(stories)} stories...\n")
 
-# Add your API key here if not using environment variable:
-API_KEY = os.environ.get("GROQ_API_KEY") or "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"
-
-response = Groq(api_key=API_KEY).chat.completions.create(
-    model="llama-3.3-70b-versatile",  # CORRECTED MODEL NAME
-    messages=[{"role":"user","content":f"{PROMPT}\n\nSOURCE STORIES:\n{json.dumps(stories)}"}],
+# Run with Groq API
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+response = client.chat.completions.create(
+    model="gpt-oss-120b",  # The specific model you requested
+    messages=[{
+        "role": "user",
+        "content": f"{prompt}\n\nSOURCE STORIES:\n{json.dumps(stories, indent=2)}"
+    }],
     max_tokens=8000,
     temperature=0.3
-)
-
-with open('Calendar_guide.md', 'w') as f:
-    f.write(response.choices[0].message.content)
-
-print("✅ Done: Calendar_guide.md")
-print(f"📈 Tokens: {response.usage.total_tokens}")
+) 
