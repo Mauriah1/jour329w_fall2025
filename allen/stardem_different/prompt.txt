@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""
+Run: python3 prompt.txt
+"""
+import json, os
+from groq import Groq
+
+# YOUR PROMPT
+PROMPT = """
+You are creating a BEAT CALENDAR & REFERENCE GUIDE for a race/diversity reporter covering Maryland's Eastern Shore.
+
+**SOURCE MATERIAL:** Use ONLY the stories provided below
+**FORMAT:** Event calendar style with quick-reference sections (NOT narrative prose)
+**NO FABRICATION:** Use only names, events, dates, and details explicitly found in the source stories
+
+## REQUIRED SECTIONS:
+
+1. ANNUAL EVENT CALENDAR - chronological with dates, locations, contacts, story angles
+2. RECURRING COVERAGE OPPORTUNITIES - by theme (heritage months, pride, voting, indigenous)
+3. HIGH-PRIORITY SOURCE DIRECTORY - contact cards with ⭐ for 3+ mentions
+4. COUNTY-BY-COUNTY QUICK FACTS - demographics, organizations, recent stories, gaps
+5. STORY TRACKER LOG - table of past coverage
+6. BREAKING NEWS CONTACTS - organized by issue type
+7. HISTORICAL MILESTONES - timeline format
+8. STORY IDEA GENERATOR - watchdog, human interest, trends, anniversaries
+9. GLOSSARY OF TERMS - Shore-specific only
+10. COVERAGE GAPS & OPPORTUNITIES
+
+Use emojis (📍📰👤📅⭐), bullet points, tables. NO long paragraphs or narrative.
+"""
+
+# Load stories and run
+print("🚀 Running with Groq llama-3.3-70b-versatile model...")
+stories = json.load(open('source_stories_final.json'))
+print(f"📊 Processing {len(stories)} stories...\n")
+
+# Add your API key here if not using environment variable:
+API_KEY = os.environ.get("GROQ_API_KEY") or "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"
+
+response = Groq(api_key=API_KEY).chat.completions.create(
+    model="llama-3.3-70b-versatile",  # CORRECTED MODEL NAME
+    messages=[{"role":"user","content":f"{PROMPT}\n\nSOURCE STORIES:\n{json.dumps(stories)}"}],
+    max_tokens=8000,
+    temperature=0.3
+)
+
+with open('Calendar_guide.md', 'w') as f:
+    f.write(response.choices[0].message.content)
+
+print("✅ Done: Calendar_guide.md")
+print(f"📈 Tokens: {response.usage.total_tokens}")

@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""
+Run: python3 prompt.txt
+Creates a colorful, visual Markdown beat book with charts and bios
+"""
+import json, os
+from groq import Groq
+
+# YOUR PROMPT
+PROMPT = """
+You are creating a COLORFUL, VISUAL BEAT BOOK (Markdown format) for a race/diversity reporter covering Maryland's Eastern Shore.
+
+**SOURCE MATERIAL:** Use ONLY the stories provided below
+**FORMAT:** Markdown (.md) file with visual elements, emojis, tables, and chart descriptions
+**OUTPUT:** Beautiful, organized Markdown document
+
+## REQUIREMENTS:
+
+### 1. VISUAL STYLE
+- Heavy use of emojis for visual interest (📊 🎨 👥 📍 ⭐ 💚 🔥 ⚡)
+- Color indicators using emojis:
+  - 🔴 High priority / Most coverage
+  - 🟡 Medium priority / Some coverage  
+  - 🟢 Low priority / Gaps (verde effect - opportunities!)
+  - ⭐ Top sources (3+ mentions)
+- Tables for data visualization
+- ASCII bar charts where appropriate
+- Section dividers with emoji patterns
+
+### 2. CIRCLE CHART DATA (Display as Tables)
+Create tables showing:
+- 📊 **Stories by County** (with percentage bars using █ blocks)
+- 📰 **Coverage by Topic** (voting rights, LGBTQ+, immigration, indigenous)
+- 📅 **Timeline Distribution** (stories by year/month)
+- 👥 **Source Mentions** (top 10 people/organizations with ⭐⭐⭐ ratings)
+
+Example format:
+```
+| County | Stories | Visual Bar | Coverage |
+|--------|---------|------------|----------|
+| 🔴 Talbot | 15 | ████████████████ | High |
+| 🟡 Dorchester | 8 | ████████ | Medium |
+| 🟢 Worcester | 1 | █ | Gap |
+```
+
+### 3. PEOPLE BIOS (TOP 10) - Profile Cards
+For each top person/organization, create a visually distinct card:
+
+```
+---
+## 👤 [NAME] ⭐⭐⭐
+
+**Role:** [Title/Organization]
+
+**Why Essential:** [2-3 sentences explaining their importance]
+
+**Story Appearances:** 🔢 [X] stories
+
+**Key Topics:** 🎯 [Tag] | 🎯 [Tag] | 🎯 [Tag]
+
+**Active In:** 📍 [Counties]
+
+**Contact:** 📞 [blank] | 📧 [blank]
+
+💚 **Verde Note:** [If applicable - community champion/positive impact]
+---
+```
+
+### 4. SECTIONS TO INCLUDE
+
+1. **📋 Table of Contents** with emoji navigation
+2. **📊 Coverage Dashboard** - visual tables of story distribution
+3. **🔥 Top 10 People & Organizations** - profile cards with bios
+4. **📍 County-by-County Breakdown** - visual cards per county
+5. **💡 Story Ideas** - categorized list (watchdog, human interest, trends, anniversaries)
+6. **📅 Recurring Events Calendar** - monthly grid
+7. **🕐 Historical Timeline** - major milestones with dates
+8. **🟢 Coverage Gaps & Opportunities** - verde highlighting for underreported areas
+9. **📞 Quick Contact Directory** - table format
+
+### 5. VISUAL ELEMENTS
+
+Use these throughout:
+- **Emoji headers:** Every section starts with relevant emoji
+- **Progress bars:** Use █ blocks to show proportions
+- **Rating stars:** ⭐⭐⭐ for priority levels
+- **Color dots:** 🔴🟡🟢 for status indicators
+- **Verde callouts:** 💚 boxes for opportunities/wins
+- **Dividers:** `---` with emoji patterns like `✨---✨`
+
+### 6. VERDE EFFECT 💚
+
+Highlight with green emoji for:
+- Coverage gaps = opportunities (🟢 + 💚)
+- Community victories/positive stories (💚✨)
+- Growth areas (📈💚)
+- Underreported communities that need attention
+
+Example:
+```
+💚 **VERDE OPPORTUNITY** 💚
+Worcester County: Only 1 story in 2 years - huge gap for Latino community coverage!
+```
+
+### 7. DATA VISUALIZATION
+
+For each chart, include:
+- Clear title with emoji
+- Table with visual bars (█ blocks)
+- Percentage or count
+- Color coding (🔴🟡🟢)
+- Key insights
+
+## CRITICAL INSTRUCTIONS:
+- Output ONLY the Markdown content
+- NO code blocks, just pure Markdown
+- Extract all data from source stories provided
+- Make it visually engaging with emojis and tables
+- Use verde (💚🟢) to highlight opportunities
+- Include actual names, dates, events from stories
+- Professional but fun to read
+
+Generate the complete Markdown beat book now.
+"""
+
+# Load stories and run
+print("🎨 Generating colorful Markdown beat book...")
+stories = json.load(open('source_stories_final.json'))
+print(f"📊 Processing {len(stories)} stories...\n")
+
+API_KEY = os.environ.get("GROQ_API_KEY") or "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"
+
+response = Groq(api_key=API_KEY).chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[{"role":"user","content":f"{PROMPT}\n\nSOURCE STORIES:\n{json.dumps(stories)}"}],
+    max_tokens=8000,
+    temperature=0.7
+)
+
+with open('Beat_Book_Visual.md', 'w') as f:
+    f.write(response.choices[0].message.content)
+
+print("✅ Done: Beat_Book_Visual.md")
+print("🌈 Colorful, emoji-rich Markdown beat book created!")
+print(f"📈 Tokens: {response.usage.total_tokens}")
