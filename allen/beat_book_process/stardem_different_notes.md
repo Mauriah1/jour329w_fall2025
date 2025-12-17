@@ -1,0 +1,9 @@
+Stardem Different 
+
+For this version of the beatbook I wanted to do two creative style beat books. I wanted to make the first one look like a beat book that was in a style of a event calendar to see if that was would produce a version that would be information. I also wanted to create another beat book that was colorful and had meanlingful charts and links! I did not want charts that I have been getting with just a list in the front and bad formation that followed but charts that were circular, and maybe informative and I wanted to push that beat book to be something that was more fun too look at. 
+
+The results that yielded from this were significantlly bad. The first Beat Book I created was actually way better than the second one. The first one did provide a chronlogical order of all of the stories, and people involved within the 119 stories. But it was entirely too many bullet points and it was entirely too wordy. Also if it were a new reporter looking at this list maybe it would be helpful a tad but not not helful in the sense of actually understanding that persons job or new location they are covering completly. It would show them the type of stories that were covered and maybe some headling and potential sources to look at, but it wouldnt get them ready to actually be at that new station. 
+
+For the second beat book this was significantlly worse the first one. It was repetive and didnt give me any information that I see would be very helpful to that news reporter. The only thing maybe from the charts that I see can be helpful is recurring events and where the coverage of these type of stories are actually coming from but ulimately this version was all color and no facts that were helpful. 
+
+In conclusion creating a version that is very colorful and has a lot of charts and lists is one that doesnt quite get the job across well and doesn't bring that person into that job being prepared to cover that area. 
