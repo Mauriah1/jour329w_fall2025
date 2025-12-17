@@ -1,195 +1,154 @@
-# NEW PROMPT: Event Calendar-Style Beat Book
+#!/usr/bin/env python3
+"""
+Run: python3 prompt.txt
+Creates a colorful, visual Markdown beat book with charts and bios
 
-prompt = f"""
-You are creating a BEAT CALENDAR & REFERENCE GUIDE for a race/diversity reporter covering Maryland's Eastern Shore.
+SETUP: export GROQ_API_KEY="your_key_here"
+"""
+import json, os, sys
+from groq import Groq
 
-**SOURCE MATERIAL:** Use ONLY the stories in source_stories_final.json
-**FORMAT:** Event calendar style with quick-reference sections (NOT narrative prose)
-**NO FABRICATION:** Use only names, events, dates, and details explicitly found in the source stories
+# Check for API key
+API_KEY = os.environ.get("GROQ_API_KEY")
+if not API_KEY:
+    print("❌ ERROR: GROQ_API_KEY environment variable not set!")
+    print("\nTo fix this, run:")
+    print("  export GROQ_API_KEY='your_groq_api_key_here'")
+    print("\nGet your key at: https://console.groq.com/keys")
+    sys.exit(1)
 
----
+# YOUR PROMPT
+PROMPT = """
+You are creating a COLORFUL, VISUAL BEAT BOOK (Markdown format) for a race/diversity reporter covering Maryland's Eastern Shore.
 
-## REQUIRED SECTIONS:
+**SOURCE MATERIAL:** Use ONLY the stories provided below
+**FORMAT:** Markdown (.md) file with visual elements, emojis, tables, and chart descriptions
+**OUTPUT:** Beautiful, organized Markdown document
 
-### 1. ANNUAL EVENT CALENDAR
-Format as a chronological calendar showing:
-- Event name
-- Date (if specific) or Month
-- Location (County/City)
-- Key contacts/organizations involved
-- Brief description (1-2 sentences max)
-- Story potential/angle
+## REQUIREMENTS:
+
+### 1. VISUAL STYLE
+- Heavy use of emojis for visual interest (📊 🎨 👥 📍 ⭐ 💚 🔥 ⚡)
+- Color indicators using emojis:
+  - 🔴 High priority / Most coverage
+  - 🟡 Medium priority / Some coverage  
+  - 🟢 Low priority / Gaps (verde effect - opportunities!)
+  - ⭐ Top sources (3+ mentions)
+- Tables for data visualization
+- ASCII bar charts where appropriate
+- Section dividers with emoji patterns
+
+### 2. CIRCLE CHART DATA (Display as Tables)
+Create tables showing:
+- 📊 **Stories by County** (with percentage bars using █ blocks)
+- 📰 **Coverage by Topic** (voting rights, LGBTQ+, immigration, indigenous)
+- 📅 **Timeline Distribution** (stories by year/month)
+- 👥 **Source Mentions** (top 10 people/organizations with ⭐⭐⭐ ratings)
 
 Example format:
 ```
-FEBRUARY
-Black History Month Planning (Dec-Feb)
-📍 Talbot County
-👤 Contact: Easton Economic Development Corporation
-📋 Multiple cultural heritage programs, MLK breakfasts
-📰 Story angle: Measure community participation, economic impact
-
-MLK Day Breakfast (Jan 17)
-📍 Washington College (Kent County)
-👤 Contact: Minary's Dream Alliance, Chester Valley Ministers
-📋 Annual commemoration, student involvement, service awards
-📰 Story angle: Interview award recipients, youth perspectives
+| County | Stories | Visual Bar | Coverage |
+|--------|---------|------------|----------|
+| 🔴 Talbot | 15 | ████████████████ | High |
+| 🟡 Dorchester | 8 | ████████ | Medium |
+| 🟢 Worcester | 1 | █ | Gap |
 ```
 
-### 2. RECURRING COVERAGE OPPORTUNITIES
-Group by theme/season:
-- HERITAGE MONTHS (with specific Shore activities)
-- PRIDE EVENTS (by county)
-- VOTING RIGHTS ANNIVERSARIES
-- INDIGENOUS OBSERVANCES
-- CULTURAL CELEBRATIONS
+### 3. PEOPLE BIOS (TOP 10) - Profile Cards
+For each top person/organization, create a visually distinct card:
 
-### 3. HIGH-PRIORITY SOURCE DIRECTORY
-Organize as quick-reference contact cards:
+```
+---
+## 👤 [NAME] ⭐⭐⭐
 
-**CIVIL RIGHTS & VOTING**
-⭐ Carl Snowden (3+ mentions)
-- Role: Caucus of African American Leaders Convener
-- Why essential: Primary organizer for voting rights, DEI debates
-- Counties active: Talbot, Dorchester, Caroline
-- Recent stories: Federalsburg settlement, Malkus Bridge campaign
-- Contact: [blank for reporter]
+**Role:** [Title/Organization]
 
-**LATINO/IMMIGRANT SERVICES**
-⭐ Chesapeake Multicultural Resource Center (3+ mentions)
-- Key staff: Victoria Gómez Lozano (Deputy Director)
-- Service area: Multi-county Shore coverage
-- Annual clients: 3,500+
-- Recent stories: Immigration services, Posada celebration
-- Contact: [blank for reporter]
+**Why Essential:** [2-3 sentences explaining their importance]
 
-### 4. COUNTY-BY-COUNTY QUICK FACTS
-For each county, provide:
-- Population demographics (if mentioned in stories)
-- Key organizations (with ⭐ for 3+ mentions)
-- Recent major stories (with dates)
-- Story gaps/opportunities
-- Sensitive topics to handle carefully
+**Story Appearances:** 🔢 [X] stories
+
+**Key Topics:** 🎯 [Tag] | 🎯 [Tag] | 🎯 [Tag]
+
+**Active In:** 📍 [Counties]
+
+**Contact:** 📞 [blank] | 📧 [blank]
+
+💚 **Verde Note:** [If applicable - community champion/positive impact]
+---
+```
+
+### 4. SECTIONS TO INCLUDE
+
+1. **📋 Table of Contents** with emoji navigation
+2. **📊 Coverage Dashboard** - visual tables of story distribution
+3. **🔥 Top 10 People & Organizations** - profile cards with bios
+4. **📍 County-by-County Breakdown** - visual cards per county
+5. **💡 Story Ideas** - categorized list (watchdog, human interest, trends, anniversaries)
+6. **📅 Recurring Events Calendar** - monthly grid
+7. **🕐 Historical Timeline** - major milestones with dates
+8. **🟢 Coverage Gaps & Opportunities** - verde highlighting for underreported areas
+9. **📞 Quick Contact Directory** - table format
+
+### 5. VISUAL ELEMENTS
+
+Use these throughout:
+- **Emoji headers:** Every section starts with relevant emoji
+- **Progress bars:** Use █ blocks to show proportions
+- **Rating stars:** ⭐⭐⭐ for priority levels
+- **Color dots:** 🔴🟡🟢 for status indicators
+- **Verde callouts:** 💚 boxes for opportunities/wins
+- **Dividers:** `---` with emoji patterns like `✨---✨`
+
+### 6. VERDE EFFECT 💚
+
+Highlight with green emoji for:
+- Coverage gaps = opportunities (🟢 + 💚)
+- Community victories/positive stories (💚✨)
+- Growth areas (📈💚)
+- Underreported communities that need attention
 
 Example:
 ```
-TALBOT COUNTY (Easton)
-Recent stories: 15 (most active county)
-Key themes: DEI debates, Douglass legacy, Pride controversies
-⭐ High-priority: Carl Snowden, Caucus of African American Leaders
-
-MAJOR EVENTS:
-- Apr 7, 2024: $260K voting-rights settlement
-- Jun 5, 2024: Delmarva Pride Festival
-- Feb 17, 2024: "Troubled Waters" Black watermen panel
-
-STORY GAPS: 
-- Limited coverage of Asian American community
-- Follow-up needed on DEI resolution outcome
-
-SENSITIVITY NOTES:
-- ICE activism may evoke trauma; approach with care
-- Frederick Douglass narrative is source of pride
+💚 **VERDE OPPORTUNITY** 💚
+Worcester County: Only 1 story in 2 years - huge gap for Latino community coverage!
 ```
 
-### 5. STORY TRACKER LOG (Past Coverage)
-Create a table showing:
-| Date | Headline/Topic | County | Key Sources | Follow-up Needed? |
-|------|----------------|---------|-------------|-------------------|
+### 7. DATA VISUALIZATION
 
-### 6. BREAKING NEWS CONTACTS
-Quick list organized by issue:
-**IMMIGRATION/ICE:**
-**HATE CRIMES:**
-**VOTING RIGHTS:**
-**LGBTQ+ ISSUES:**
-**INDIGENOUS AFFAIRS:**
+For each chart, include:
+- Clear title with emoji
+- Table with visual bars (█ blocks)
+- Percentage or count
+- Color coding (🔴🟡🟢)
+- Key insights
 
-### 7. HISTORICAL MILESTONES (Timeline Format)
-Key dates journalists should know:
-```
-1848 - Pearl escape attempt
-1865 - Juneteenth (June 19)
-1960s - Cambridge Movement
-2023 - Federalsburg first Black council members elected (Sept 26)
-2024 - Just Communities designation
-```
+## CRITICAL INSTRUCTIONS:
+- Output ONLY the Markdown content
+- NO code blocks, just pure Markdown
+- Extract all data from source stories provided
+- Make it visually engaging with emojis and tables
+- Use verde (💚🟢) to highlight opportunities
+- Include actual names, dates, events from stories
+- Professional but fun to read
 
-### 8. STORY IDEA GENERATOR
-Organized by type:
-**WATCHDOG (Accountability):**
-**HUMAN INTEREST (Profiles/Features):**
-**TREND (Analysis):**
-**ANNIVERSARY (Pegs):**
-
-### 9. GLOSSARY OF TERMS
-ONLY include:
-- Shore-specific place names with cultural significance
-- Local organizational acronyms
-- Historical terms unique to the region
-(If insufficient terms exist in source material, note: "Limited local terminology captured in source coverage")
-
-### 10. COVERAGE GAPS & OPPORTUNITIES
-**UNDERREPORTED COUNTIES:**
-**UNDERREPORTED COMMUNITIES:**
-**SEASONAL OPPORTUNITIES:**
-
----
-
-## FORMATTING RULES:
-
-✅ USE:
-- Bullet points, tables, calendar grids
-- Emojis for visual scanning (📍📰👤📅⭐)
-- Bold for key names/organizations
-- Date stamps for everything
-- "⭐" to mark high-priority sources (3+ mentions)
-
-❌ AVOID:
-- Long paragraphs
-- Narrative storytelling
-- Flowery descriptions
-- Editorial commentary
-
-## CRITICAL REMINDERS:
-
-1. **NO FABRICATION**: Every name, date, event, quote must be in source_stories_final.json
-2. **SOURCE ATTRIBUTION**: When referencing specific stories, include date
-3. **HIGH-PRIORITY MARKERS**: Use ⭐ for people/orgs mentioned 3+ times
-4. **CONTACT INFO**: Leave blank fields for reporter to fill in (phone/email)
-5. **ACCURACY OVER COMPLETENESS**: If data doesn't exist in sources, note the gap
-
----
-
-Generate the beat calendar/reference guide now using the stories in source_stories_final.json.
+Generate the complete Markdown beat book now.
 """
-"""
-Run prompt.txt with Groq gpt-oss-120b model
-Usage: python3 run.py
-"""
-import json
-import os
-from groq import Groq
 
-# Load your prompt.txt
-with open('prompt.txt', 'r') as f:
-    prompt = f.read()
-
-# Load stories
-with open('source_stories_final.json', 'r') as f:
-    stories = json.load(f)
-
-print("🚀 Running prompt.txt with Groq gpt-oss-120b model...")
+# Load stories and run
+print("🎨 Generating colorful Markdown beat book...")
+stories = json.load(open('source_stories_final.json'))
 print(f"📊 Processing {len(stories)} stories...\n")
 
-# Run with Groq API
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-response = client.chat.completions.create(
-    model="gpt-oss-120b",  # The specific model you requested
-    messages=[{
-        "role": "user",
-        "content": f"{prompt}\n\nSOURCE STORIES:\n{json.dumps(stories, indent=2)}"
-    }],
+response = Groq(api_key=API_KEY).chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[{"role":"user","content":f"{PROMPT}\n\nSOURCE STORIES:\n{json.dumps(stories)}"}],
     max_tokens=8000,
-    temperature=0.3
-) 
+    temperature=0.7
+)
+
+with open('Beat_Book_Visual.md', 'w') as f:
+    f.write(response.choices[0].message.content)
+
+print("✅ Done: Beat_Book_Visual.md")
+print("🌈 Colorful, emoji-rich Markdown beat book created!")
+print(f"📈 Tokens: {response.usage.total_tokens}")
